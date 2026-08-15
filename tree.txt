@@ -1,0 +1,34 @@
+Folder PATH listing for volume Windows-SSD
+Volume serial number is 00000246 986A:1C2F
+C:\USERS\KADAM\JW-MEETING-COMPANION\SRC\FEATURES\MEETING-SCHEDULE
+¦   index.ts
+¦   shared
+¦   
++---components
+¦   ¦   MeetingDashboard.tsx
+¦   ¦   MeetingScheduleHeader.tsx
+¦   ¦   
+¦   +---weekend
+¦           field-service
+¦           other
+¦           
++---export
++---hooks
++---midweek
+¦       ApplySection.tsx
+¦       ChristianLifeSection.tsx
+¦       ClosingSection.tsx
+¦       MeetingInformationSection.tsx
+¦       MidweekMeetingEditor.tsx
+¦       MidweekMeetingPage.tsx
+¦       TreasuresSection.tsx
+¦       
++---models
+¦       MidweekMeetingSchedule.ts
+¦       
++---pages
+¦       MeetingSchedulePage.tsx
+¦       
++---services
+        createEmptyMidweekSchedule.ts
+        

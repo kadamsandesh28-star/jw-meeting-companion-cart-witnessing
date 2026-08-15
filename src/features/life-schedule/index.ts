@@ -1,0 +1,1 @@
+export { default as LifeSchedulePage } from "./pages/LifeSchedulePage";

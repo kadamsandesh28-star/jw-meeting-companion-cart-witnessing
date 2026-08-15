@@ -1,0 +1,619 @@
+Folder PATH listing for volume Windows-SSD
+Volume serial number is 000001B6 986A:1C2F
+C:\USERS\KADAM\JW-MEETING-COMPANION\SRC
+|   App.css
+|   App.tsx
+|   AppRoutes.tsx
+|   index.css
+|   main.tsx
+|   vite-env.d.ts
+|   
++---app
+|   +---layout
+|   |       AppDrawer.tsx
+|   |       AppHeader.tsx
+|   |       AppLayout.tsx
+|   |       Navigation.ts
+|   |       
+|   \---routes
++---archive
++---assets
+|       hero.png
+|       react.svg
+|       vite.svg
+|       
++---components
+|   |   AssignmentRow.tsx
+|   |   ConfirmDialog.tsx
+|   |   DashboardCard.tsx
+|   |   HeroCard.tsx
+|   |   MeetingSection.tsx
+|   |   MeetingSectionCard.tsx
+|   |   MeetingTimerCard.tsx
+|   |   PageHeader.tsx
+|   |   PlannerCard.tsx
+|   |   StatCard.tsx
+|   |   StopwatchPanel.tsx
+|   |   SummaryCard.tsx
+|   |   TimerTabs.tsx
+|   |   
+|   +---bible
+|   |       BookAccordion.tsx
+|   |       ReadingItem.tsx
+|   |       ReadingProgressCard.tsx
+|   |       SectionAccordion.tsx
+|   |       TodayReadingCard.tsx
+|   |       
+|   +---chairman
+|   |       LapList.tsx
+|   |       Stopwatch.tsx
+|   |       TimerControls.tsx
+|   |       TimerDisplay.tsx
+|   |       
+|   +---common
+|   |       ConfirmDialog.tsx
+|   |       EmptyState.tsx
+|   |       PageHeader.tsx
+|   |       SearchBar.tsx
+|   |       StatCard.tsx
+|   |       StatusBadge.tsx
+|   |       StatusChip.tsx
+|   |       
+|   +---congregation
+|   +---dashboard
+|   |       GreetingCard.tsx
+|   |       MeetingPreparationCard.tsx
+|   |       NextMeetingCard.tsx
+|   |       QuickActionsCard.tsx
+|   |       ReminderCard.tsx
+|   |       TodaysFocusCard.tsx
+|   |       WeeklyProgressCard.tsx
+|   |       
+|   +---dashboardService.ts
+|   +---dialogs
+|   |       AddPublisherDialog.tsx
+|   |       DeletePublisherDialog.tsx
+|   |       EditPublisherDialog.tsx
+|   |       UnlockCongregationDialog.tsx
+|   |       
+|   +---layout
+|   |       AppHeader.tsx
+|   |       AppLayout.tsx
+|   |       BottomNav.tsx
+|   |       PageContainer.tsx
+|   |       PageHeader.tsx
+|   |       
+|   +---meetings
+|   |   |   MeetingHeader.tsx
+|   |   |   MeetingSectionCard.tsx
+|   |   |   MeetingTabs.tsx
+|   |   |   MidweekMeeting.tsx
+|   |   |   WeekendMeeting.tsx
+|   |   |   
+|   |   \---panels
+|   |           CompletionPanel.tsx
+|   |           NotesPanel.tsx
+|   |           
+|   +---publisher
+|   |   |   CollapsibleSection.tsx
+|   |   |   InfoCard.tsx
+|   |   |   InfoRow.tsx
+|   |   |   MinistryCard.tsx
+|   |   |   PersonalCard.tsx
+|   |   |   PrivilegeChip.tsx
+|   |   |   ProfileHeader.tsx
+|   |   |   ProfileSection.tsx
+|   |   |   PublisherCard.tsx
+|   |   |   PublisherForm.tsx
+|   |   |   PublisherHeader.tsx
+|   |   |   SectionCard.tsx
+|   |   |   ShepherdingCard.tsx
+|   |   |   SpiritualCard.tsx
+|   |   |   
+|   |   +---cards
+|   |   |       PublisherCardHeader.tsx
+|   |   |       PublisherManagementCard.tsx
+|   |   |       
+|   |   +---dialog
+|   |   |       PublisherDialog.tsx
+|   |   |       
+|   |   +---form
+|   |   |   |   PublisherForm.tsx
+|   |   |   |   
+|   |   |   \---sections
+|   |   |           PublisherAddressInfo.tsx
+|   |   |           PublisherBasicInfo.tsx
+|   |   |           PublisherCongregationInfo.tsx
+|   |   |           PublisherContactInfo.tsx
+|   |   |           PublisherEmergencyContact.tsx
+|   |   |           
+|   |   \---profile
+|   |           AssignmentsCard.tsx
+|   |           ContactCard.tsx
+|   |           FamilyCard.tsx
+|   |           NotesCard.tsx
+|   |           PrivilegesCard.tsx
+|   |           ProfileSection.tsx
+|   |           SpiritualStatusCard.tsx
+|   |           TimelineCard.tsx
+|   |           
+|   +---search
+|   |       SearchDialog.tsx
+|   |       
+|   +---shell
+|   |       AppShell.tsx
+|   |       Header.tsx
+|   |       MobileDrawer.tsx
+|   |       Navigation.ts
+|   |       Sidebar.tsx
+|   |       WorkspaceSwitcher.tsx
+|   |       
+|   +---timer
+|   |       LapList.tsx
+|   |       Stopwatch.tsx
+|   |       TimerControls.tsx
+|   |       TimerDisplay.tsx
+|   |       
+|   \---ui
+|           ActionCard.tsx
+|           AppCard.tsx
+|           Card.tsx
+|           ConfirmDialog.tsx
+|           DataTable.tsx
+|           EmptyState.tsx
+|           InfoCard.tsx
+|           LoadingState.tsx
+|           PageHeader.tsx
+|           SearchBar.tsx
+|           SectionCard.tsx
+|           StatCard.tsx
+|           
++---constants
+|       storageKeys.ts
+|       
++---contexts
+|       ElderAuthContext.tsx
+|       PlannerContext.tsx
+|       WorkspaceContext.tsx
+|       
++---data
+|   |   bibleBooks.ts
+|   |   bibleInOneYear.ts
+|   |   dashboardData.ts
+|   |   meetingSections.ts
+|   |   meetingTimers.ts
+|   |   mockDashboard.ts
+|   |   mockPublishers.ts
+|   |   plannerSeed.ts
+|   |   
+|   +---bible
+|   |       books.ts
+|   |       schedule.ts
+|   |       types.ts
+|   |       
+|   +---generators
+|   |       readingPlanGenerator.ts
+|   |       
+|   +---mock
+|   |       meetingData.ts
+|   |       
+|   \---plans
+|       +---generated
+|       |       oneYear.ts
+|       |       
+|       +---hebrewScriptures
+|       |   |   index.ts
+|       |   |   metadata.ts
+|       |   |   
+|       |   \---books
+|       +---oneYear
+|       |   |   index.ts
+|       |   |   metadata.ts
+|       |   |   ranges.ts
+|       |   |   
+|       |   \---books
+|       |           deuteronomy.ts
+|       |           exodus.ts
+|       |           genesis.ts
+|       |           leviticus.ts
+|       |           numbers.ts
+|       |           
+|       \---registry
+|               index.ts
+|               
++---features
+|   +---congregation
+|   |   |   index.ts
+|   |   |   
+|   |   +---body-of-elders
+|   |   |   +---components
+|   |   |   |       AppointmentInformation.tsx
+|   |   |   |       BasicInformation.tsx
+|   |   |   |       BodyMemberForm.tsx
+|   |   |   |       
+|   |   |   +---data
+|   |   |   |       sampleBodyMembers.ts
+|   |   |   |       
+|   |   |   +---hooks
+|   |   |   |       useBodyMembers.ts
+|   |   |   |       
+|   |   |   +---pages
+|   |   |   |       BodyMemberEditor.tsx
+|   |   |   |       BodyMemberList.tsx
+|   |   |   |       BodyMemberProfile.tsx
+|   |   |   |       
+|   |   |   +---services
+|   |   |   |       bodyMemberService.ts
+|   |   |   |       
+|   |   |   +---types
+|   |   |   |       bodyMember.ts
+|   |   |   |       
+|   |   |   \---utils
+|   |   +---components
+|   |   |   |   PublisherCard.tsx
+|   |   |   |   PublisherFilters.tsx
+|   |   |   |   PublisherSearch.tsx
+|   |   |   |   PublisherTable.tsx
+|   |   |   |   RecentActivity.tsx
+|   |   |   |   StatsCards.tsx
+|   |   |   |   
+|   |   |   \---editor
+|   |   |           ContactInformation.tsx
+|   |   |           FamilyInformation.tsx
+|   |   |           PersonalInformation.tsx
+|   |   |           PublisherForm.tsx
+|   |   |           
+|   |   +---dashboard
+|   |   |   +---components
+|   |   |   |       CongregationDepartmentsCard.tsx
+|   |   |   |       CongregationOverview.tsx
+|   |   |   |       CongregationOverviewCard.tsx
+|   |   |   |       DashboardHeader.tsx
+|   |   |   |       OverseersCard.tsx
+|   |   |   |       QuickActionsCard.tsx
+|   |   |   |       RecentActivityCard.tsx
+|   |   |   |       ServiceGroupsCard.tsx
+|   |   |   |       TerritoriesCard.tsx
+|   |   |   |       
+|   |   |   \---pages
+|   |   |           Dashboard.tsx
+|   |   |           
+|   |   +---data
+|   |   +---departments
+|   |   |   +---components
+|   |   |   |       CongregationDepartmentsCard.tsx
+|   |   |   |       
+|   |   |   +---data
+|   |   |   |       sampleDepartments.ts
+|   |   |   |       
+|   |   |   +---hooks
+|   |   |   |       useDepartments.ts
+|   |   |   |       
+|   |   |   +---pages
+|   |   |   |       DepartmentList.tsx
+|   |   |   |       
+|   |   |   +---services
+|   |   |   |       departmentService.ts
+|   |   |   |       
+|   |   |   \---types
+|   |   |           Department.ts
+|   |   |           
+|   |   +---hooks
+|   |   |       usePublishers.ts
+|   |   |       
+|   |   +---pages
+|   |   |       Dashboard.tsx
+|   |   |       PublisherEditor.tsx
+|   |   |       PublisherList.tsx
+|   |   |       PublisherProfile.tsx
+|   |   |       Reports.tsx
+|   |   |       
+|   |   +---publishers
+|   |   |   +---data
+|   |   |   |       samplePublishers.ts
+|   |   |   |       
+|   |   |   +---models
+|   |   |   |       Assignment.ts
+|   |   |   |       createEmptyPublisher.ts
+|   |   |   |       FamilyMember.ts
+|   |   |   |       Privilege.ts
+|   |   |   |       Publisher.ts
+|   |   |   |       TimelineEvent.ts
+|   |   |   |       
+|   |   |   +---services
+|   |   |   |       publisherService.ts
+|   |   |   |       
+|   |   |   +---types
+|   |   |   |       enums.ts
+|   |   |   |       Publisher.ts
+|   |   |   |       
+|   |   |   \---utils
+|   |   |           getPublisherDisplayName.ts
+|   |   |           
+|   |   +---service-committee
+|   |   |   +---components
+|   |   |   |       BasicInformation.tsx
+|   |   |   |       CommitteeMembers.tsx
+|   |   |   |       ResponsibilitiesSection.tsx
+|   |   |   |       ServiceCommitteeForm.tsx
+|   |   |   |       
+|   |   |   +---pages
+|   |   |   |       ServiceCommitteeEditor.tsx
+|   |   |   |       ServiceCommitteeList.tsx
+|   |   |   |       ServiceCommitteeProfile.tsx
+|   |   |   |       
+|   |   |   +---services
+|   |   |   |       serviceCommitteeService.ts
+|   |   |   |       
+|   |   |   +---types
+|   |   |   |       ServiceCommittee.ts
+|   |   |   |       
+|   |   |   \---utils
+|   |   +---service-groups
+|   |   |   +---components
+|   |   |   |       BasicInformation.tsx
+|   |   |   |       MeetingInformation.tsx
+|   |   |   |       MembersSection.tsx
+|   |   |   |       ServiceGroupForm.tsx
+|   |   |   |       
+|   |   |   +---data
+|   |   |   |       sampleServiceGroups.ts
+|   |   |   |       
+|   |   |   +---hooks
+|   |   |   |       hooks
+|   |   |   |       useServiceGroups.ts
+|   |   |   |       
+|   |   |   +---pages
+|   |   |   |       ServiceGroupEditor.tsx
+|   |   |   |       ServiceGroupList.tsx
+|   |   |   |       ServiceGroupProfile.tsx
+|   |   |   |       
+|   |   |   +---services
+|   |   |   |       serviceGroupService.ts
+|   |   |   |       
+|   |   |   \---types
+|   |   |           serviceGroup.ts
+|   |   |           
+|   |   +---services
+|   |   |       storageService.ts
+|   |   |       
+|   |   +---territories
+|   |   |   +---components
+|   |   |   |       AssignmentInformation.tsx
+|   |   |   |       BasicInformation.tsx
+|   |   |   |       TerritoryForm.tsx
+|   |   |   |       
+|   |   |   +---data
+|   |   |   |       sampleTerritories.ts
+|   |   |   |       
+|   |   |   +---hooks
+|   |   |   |       useTerritories.ts
+|   |   |   |       
+|   |   |   +---pages
+|   |   |   |       TerritoryEditor.tsx
+|   |   |   |       TerritoryList.tsx
+|   |   |   |       TerritoryProfile.tsx
+|   |   |   |       
+|   |   |   +---services
+|   |   |   |       territoryService.ts
+|   |   |   |       
+|   |   |   +---types
+|   |   |   |       territory.ts
+|   |   |   |       
+|   |   |   \---utils
+|   |   +---types
+|   |   |       congregation.ts
+|   |   |       
+|   |   \---utils
+|   |           createEmptyPublisher.ts
+|   |           filters.ts
+|   |           sorting.ts
+|   |           validation.ts
+|   |           
+|   \---ministry
+|       +---components
+|       |       AddBibleStudyDialog.tsx
+|       |       AddReturnVisitDialog.tsx
+|       |       BibleStudyCard.tsx
+|       |       EditBibleStudyDialog.tsx
+|       |       EditReturnVisitDialog.tsx
+|       |       GenerateReportDialog.tsx
+|       |       MinistryMonthlyChart.tsx
+|       |       MinistrySessionForm.tsx
+|       |       MinistryStats.tsx
+|       |       QuickActions.tsx
+|       |       ReturnVisitCard.tsx
+|       |       SessionActions.tsx
+|       |       
+|       +---data
+|       +---hooks
+|       |       useMinistry.ts
+|       |       
+|       +---pages
+|       |       BibleStudies.tsx
+|       |       MinistryDashboard.tsx
+|       |       MinistryReports.tsx
+|       |       MinistrySession.tsx
+|       |       ReturnVisits.tsx
+|       |       
+|       +---services
+|       |       bibleStudyService.ts
+|       |       ministryService.ts
+|       |       returnVisitService.ts
+|       |       
+|       +---types
+|       |       bibleStudy.ts
+|       |       ministry.ts
+|       |       report.ts
+|       |       returnVisit.ts
+|       |       
+|       \---utils
+|               exportFieldServiceReport.ts
+|               
++---hooks
+|       useBibleReading.ts
+|       useConfirm.ts
+|       useCountdown.ts
+|       useLocalStorage.ts
+|       useSnackbar.ts
+|       useStopwatch.ts
+|       
++---models
+|       dashboard.ts
+|       
++---pages
+|   |   AssignmentPreparation.tsx
+|   |   CreatePasscode.tsx
+|   |   Goals.tsx
+|   |   MeetingTimerSettings.tsx
+|   |   MeetingTimersV2.tsx
+|   |   Midweek.tsx
+|   |   MidweekTimers.tsx
+|   |   Notes.tsx
+|   |   PersonalStudy.tsx
+|   |   PracticeTimer.tsx
+|   |   Scriptures.tsx
+|   |   Settings.tsx
+|   |   SpiritualLibrary.tsx
+|   |   Timers.tsx
+|   |   Weekend.tsx
+|   |   WeekendTimers.tsx
+|   |   
+|   +---assignments
+|   |       Assignments.tsx
+|   |       
+|   +---congregation
+|   |       CongregationDepartments.tsx
+|   |       CongregationDirectory.tsx
+|   |       CongregationResponsibilities.tsx
+|   |       FieldServiceGroups.tsx
+|   |       PublisherManagement.tsx
+|   |       PublisherProfile.tsx
+|   |       ShepherdingPlanner.tsx
+|   |       
+|   +---home
+|   |       Home.tsx
+|   |       
+|   +---library
+|   |       Gems.tsx
+|   |       Goals.tsx
+|   |       Ministry.tsx
+|   |       Research.tsx
+|   |       ResearchCollection.tsx
+|   |       Understanding.tsx
+|   |       
+|   +---meetings
+|   |       MeetingNotes.tsx
+|   |       MeetingProgress.tsx
+|   |       Meetings.tsx
+|   |       MidweekMeeting.tsx
+|   |       WeekendMeeting.tsx
+|   |       
+|   +---ministry
+|   |       Ministry.tsx
+|   |       
+|   +---personal
+|   |       BibleReading.tsx
+|   |       FamilyWorship.tsx
+|   |       Personal.tsx
+|   |       PersonalStudy.tsx
+|   |       PersonalTasks.tsx
+|   |       PrayerJournal.tsx
+|   |       
+|   +---publishers
+|   |       PublisherProfile.tsx
+|   |       
+|   +---ReturnVisits
+|   |       ReturnVisits.tsx
+|   |       
+|   +---schedule
+|   |       Schedule.tsx
+|   |       
+|   +---service
+|   |       Service.tsx
+|   |       
+|   +---settings
+|   |       Settings.tsx
+|   |       
+|   +---tools
+|   |       Tools.tsx
+|   |       
+|   \---workbook
+|           Workbook.tsx
+|           
++---security
+|   |   authService.ts
+|   |   cryptoService.ts
+|   |   inactivityTimer.ts
+|   |   passcodeService.ts
+|   |   sessionManager.ts
+|   |   types.ts
+|   |   
+|   \---Storage
+|           LocalStorageProvider.ts
+|           StorageProvider.ts
+|           
++---services
+|       assignmentNotes.ts
+|       assignmentService.ts
+|       backupService.ts
+|       bibleReadingService.ts
+|       congregationDashboardService.ts
+|       congregationService.ts
+|       dailyScriptureService.ts
+|       dashboardService.ts
+|       globalSearchService.ts
+|       meetingProgressService.ts
+|       notesStorage.ts
+|       personalStudyService.ts
+|       plannerService.ts
+|       privilegeService.ts
+|       publisherService.ts
+|       readingPlanService.ts
+|       researchService.ts
+|       scriptureStorage.ts
+|       settingsService.ts
+|       timelineService.ts
+|       timerSettings.ts
+|       userRoleService.ts
+|       
++---shared
+|   \---components
+|       \---dashboard
+|               DashboardHeader.tsx
+|               DashboardSection.tsx
+|               index.ts
+|               InfoCard.tsx
+|               QuickActionCard.tsx
+|               StatRow.tsx
+|               
++---styles
++---theme
+|       colors.ts
+|       motion.ts
+|       radius.ts
+|       shadows.ts
+|       spacing.ts
+|       theme.ts
+|       ThemeContext.tsx
+|       tokens.ts
+|       typography.ts
+|       
++---types
+|       bible.ts
+|       note.ts
+|       readingPlan.ts
+|       scripture.ts
+|       SearchResult.ts
+|       
+\---utils
+        constants.ts
+        dateUtils.ts
+        formatters.ts
+        greeting.ts
+        jwLibrary.ts
+        localStorage.ts
+        nextMeeting.ts
+        userRole.ts
+        validators.ts
+        
