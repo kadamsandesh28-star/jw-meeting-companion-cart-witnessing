@@ -31,10 +31,10 @@ function shiftIsoDate(value: string, days: number) {
   return d.toISOString().slice(0, 10);
 }
 
-function saturdayOf(value: string) {
+function mondayOf(value: string) {
   const d = new Date(`${value}T00:00:00`);
   const day = d.getDay();
-  d.setDate(d.getDate() + (6 - day));
+  d.setDate(d.getDate() - ((day + 6) % 7));
   return d.toISOString().slice(0, 10);
 }
 
@@ -42,34 +42,38 @@ function saturdayOf(value: string) {
  * test schedule is exactly one or more whole weeks behind the selected
  * Saturday, migrate its dates forward rather than exporting a mixed week. */
 function normalizeScheduleWeek(schedule: CartWitnessingSchedule) {
-  const targetWeek = schedule.weekOf;
-  if (!schedule.entries.length) return schedule;
-  const weekDates = new Set(getWeekDates(targetWeek));
-  if (schedule.entries.some((entry) => weekDates.has(entry.date))) return schedule;
+  const targetWeek = mondayOf(schedule.weekOf);
+  const sourceWeeks = [...new Set([
+    ...schedule.entries.map((entry) => mondayOf(entry.date)),
+    ...Object.keys(schedule.dayCaptains ?? {}).map((date) => mondayOf(date)),
+  ])];
 
-  const sourceWeeks = [...new Set(schedule.entries.map((entry) => saturdayOf(entry.date)))];
-  if (sourceWeeks.length !== 1) return schedule;
-  const source = sourceWeeks[0];
-  const deltaDays = Math.round((new Date(`${targetWeek}T00:00:00`).getTime() - new Date(`${source}T00:00:00`).getTime()) / 86400000);
-  if (deltaDays % 7 !== 0 || deltaDays === 0) return schedule;
+  let entries = schedule.entries;
+  let dayCaptains = schedule.dayCaptains ?? {};
 
-  const entries = schedule.entries.map((entry) => ({ ...entry, date: shiftIsoDate(entry.date, deltaDays) }));
-  const dayCaptains = Object.fromEntries(Object.entries(schedule.dayCaptains ?? {}).map(([date, captains]) => [shiftIsoDate(date, deltaDays), captains]));
-  return { ...schedule, entries, dayCaptains, updatedAt: Date.now() };
+  if (sourceWeeks.length === 1 && sourceWeeks[0] !== targetWeek) {
+    const sourceWeek = sourceWeeks[0];
+    const deltaDays = Math.round((new Date(`${targetWeek}T00:00:00`).getTime() - new Date(`${sourceWeek}T00:00:00`).getTime()) / 86400000);
+    if (deltaDays % 7 === 0) {
+      entries = schedule.entries.map((entry) => ({ ...entry, date: shiftIsoDate(entry.date, deltaDays) }));
+      dayCaptains = Object.fromEntries(Object.entries(dayCaptains).map(([date, captains]) => [shiftIsoDate(date, deltaDays), captains]));
+    }
+  }
+
+  return { ...schedule, weekOf: targetWeek, entries, dayCaptains, updatedAt: Date.now() };
 }
-
-const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 function formatDate(value: string) {
   if (!value) return "";
   return new Date(`${value}T00:00:00`).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
 }
 
-function getWeekDates(saturday: string) {
-  const date = new Date(`${saturday}T00:00:00`);
+function getWeekDates(monday: string) {
+  const date = new Date(`${monday}T00:00:00`);
   return days.map((_, index) => {
     const d = new Date(date);
-    d.setDate(date.getDate() - (6 - index));
+    d.setDate(date.getDate() + index);
     return d.toISOString().slice(0, 10);
   });
 }
@@ -104,8 +108,8 @@ export default function CartWitnessingPage() {
   const [mode, setMode] = useState<CartWitnessingMode>("weekly");
   const [schedule, setSchedule] = useState<CartWitnessingSchedule>(() => {
     const saved = loadCartWitnessingSchedules();
-    const latest = saved.sort((a, b) => b.updatedAt - a.updatedAt)[0] ?? createEmptyCartWitnessingSchedule();
-    return normalizeScheduleWeek(latest);
+    const latest = saved.sort((a, b) => b.updatedAt - a.updatedAt)[0] ?? createEmptyCartWitnessingSchedule(mondayOf(new Date().toISOString().slice(0, 10)));
+    return normalizeScheduleWeek({ ...latest, weekOf: mondayOf(new Date().toISOString().slice(0, 10)) });
   });
   const [dailyDate, setDailyDate] = useState(schedule.weekOf);
 
@@ -198,16 +202,17 @@ export default function CartWitnessingPage() {
   }
 
   function updateWeek(value: string) {
-    setSchedule((current) => ({ ...current, weekOf: value, updatedAt: Date.now() }));
+    value = mondayOf(value);
+    setSchedule((current) => { const sourceWeeks = [...new Set([...current.entries.map((entry) => mondayOf(entry.date)), ...Object.keys(current.dayCaptains ?? {}).map((date) => mondayOf(date))])]; if (sourceWeeks.length === 1 && sourceWeeks[0] !== value) { const deltaDays = Math.round((new Date(`${value}T00:00:00`).getTime() - new Date(`${sourceWeeks[0]}T00:00:00`).getTime()) / 86400000); if (deltaDays % 7 === 0) { return { ...current, weekOf: value, entries: current.entries.map((entry) => ({ ...entry, date: shiftIsoDate(entry.date, deltaDays) })), dayCaptains: Object.fromEntries(Object.entries(current.dayCaptains ?? {}).map(([date, captains]) => [shiftIsoDate(date, deltaDays), captains])), updatedAt: Date.now() }; } } return { ...current, weekOf: value, updatedAt: Date.now() }; });
     setDailyDate(value);
   }
 
   function nextWeekTemplate() {
     const next = new Date(`${schedule.weekOf}T00:00:00`);
     next.setDate(next.getDate() + 7);
-    const nextSaturday = next.toISOString().slice(0, 10);
-    setSchedule(createEmptyCartWitnessingSchedule(nextSaturday));
-    setDailyDate(nextSaturday);
+    const nextMonday = next.toISOString().slice(0, 10);
+    setSchedule(createEmptyCartWitnessingSchedule(nextMonday));
+    setDailyDate(nextMonday);
   }
 
   async function sharePdf() {
@@ -260,7 +265,7 @@ export default function CartWitnessingPage() {
 
             <Grid container spacing={2} alignItems="center">
               <Grid size={{ xs: 12, sm: 5 }}>
-                <TextField fullWidth type="date" label="Saturday / Week Of" value={schedule.weekOf} onChange={(e) => updateWeek(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
+                <TextField fullWidth type="date" label="Monday / Week Of" value={schedule.weekOf} onChange={(e) => updateWeek(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
               </Grid>
               {mode === "daily" && (
                 <Grid size={{ xs: 12, sm: 5 }}>
@@ -307,33 +312,33 @@ function WeeklyView({ dates, entries, dayCaptains, onAdd, onAddPair, onChange, o
   return (
     <Stack spacing={2}>
       {dates.map((date) => {
-        const saturday = new Date(`${date}T00:00:00`).getDay() === 6;
+        const monday = new Date(`${date}T00:00:00`).getDay() === 1;
         const dayEntries = entries
           .filter((entry) => entry.date === date)
           .sort((a, b) => (parseClock(a.time) ?? Number.MAX_SAFE_INTEGER) - (parseClock(b.time) ?? Number.MAX_SAFE_INTEGER));
-        return <DaySection key={date} date={date} saturday={saturday} entries={dayEntries} captains={dayCaptains[date] ?? []} onAdd={() => onAdd(date)} onAddPair={(minutes) => onAddPair(date, minutes)} onChange={onChange} onAssignCaptain={onAssignCaptain} onAddCaptain={() => onAddCaptain(date)} onUpdateCaptain={onUpdateCaptain} onRemoveCaptain={onRemoveCaptain} onDelete={onDelete} />;
+        return <DaySection key={date} date={date} monday={monday} entries={dayEntries} captains={dayCaptains[date] ?? []} onAdd={() => onAdd(date)} onAddPair={(minutes) => onAddPair(date, minutes)} onChange={onChange} onAssignCaptain={onAssignCaptain} onAddCaptain={() => onAddCaptain(date)} onUpdateCaptain={onUpdateCaptain} onRemoveCaptain={onRemoveCaptain} onDelete={onDelete} />;
       })}
     </Stack>
   );
 }
 
 function DailyView({ date, entries, captains, onAdd, onAddPair, onChange, onAssignCaptain, onAddCaptain, onUpdateCaptain, onRemoveCaptain, onDelete }: ViewProps) {
-  return <DaySection date={date} saturday={new Date(`${date}T00:00:00`).getDay() === 6} entries={entries} captains={captains} onAdd={onAdd} onAddPair={onAddPair} onChange={onChange} onAssignCaptain={onAssignCaptain} onAddCaptain={onAddCaptain} onUpdateCaptain={onUpdateCaptain} onRemoveCaptain={onRemoveCaptain} onDelete={onDelete} />;
+  return <DaySection date={date} monday={new Date(`${date}T00:00:00`).getDay() === 1} entries={entries} captains={captains} onAdd={onAdd} onAddPair={onAddPair} onChange={onChange} onAssignCaptain={onAssignCaptain} onAddCaptain={onAddCaptain} onUpdateCaptain={onUpdateCaptain} onRemoveCaptain={onRemoveCaptain} onDelete={onDelete} />;
 }
 
-function DaySection({ date, saturday, entries, captains, onAdd, onAddPair, onChange, onAssignCaptain, onAddCaptain, onUpdateCaptain, onRemoveCaptain, onDelete }: ViewProps & { saturday: boolean }) {
+function DaySection({ date, monday, entries, captains, onAdd, onAddPair, onChange, onAssignCaptain, onAddCaptain, onUpdateCaptain, onRemoveCaptain, onDelete }: ViewProps & { monday: boolean }) {
   return (
-    <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: 1, borderColor: saturday ? "warning.main" : "divider", bgcolor: saturday ? "warning.50" : "background.paper" }}>
+    <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: 1, borderColor: monday ? "warning.main" : "divider", bgcolor: monday ? "warning.50" : "background.paper" }}>
       <Stack spacing={2}>
         <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" alignItems={{ xs: "stretch", md: "center" }} spacing={1.5}>
           <Box>
             <Typography variant="h6" fontWeight={800}>{formatDate(date)}</Typography>
-            {saturday && <Chip size="small" label="Saturday — Priority" color="warning" sx={{ mt: 0.5 }} />}
+            {monday && <Chip size="small" label="Monday — Week Start" color="warning" sx={{ mt: 0.5 }} />}
           </Box>
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap justifyContent="flex-end">
             <Button size="small" variant="outlined" startIcon={<PersonAddAltRoundedIcon />} onClick={onAddCaptain} disabled={captains.length >= 2}>{captains.length >= 2 ? "2 Captains Added" : `Add Captain (${captains.length}/2)`}</Button>
             <Button size="small" variant="outlined" startIcon={<AddRoundedIcon />} onClick={onAdd}>Add Blank</Button>
-            <Button size="small" variant="contained" color={saturday ? "warning" : "primary"} startIcon={<AccessTimeRoundedIcon />} onClick={() => onAddPair(30)}>+ 30-min Pair</Button>
+            <Button size="small" variant="contained" color={monday ? "warning" : "primary"} startIcon={<AccessTimeRoundedIcon />} onClick={() => onAddPair(30)}>+ 30-min Pair</Button>
             <Button size="small" variant="outlined" startIcon={<AccessTimeRoundedIcon />} onClick={() => onAddPair(60)}>+ 1-hour Pair</Button>
           </Stack>
         </Stack>
@@ -409,3 +414,11 @@ function EntryCard({ entry, captains, onChange, onAssignCaptain, onDelete }: { e
     </Card>
   );
 }
+
+
+
+
+
+
+
+
