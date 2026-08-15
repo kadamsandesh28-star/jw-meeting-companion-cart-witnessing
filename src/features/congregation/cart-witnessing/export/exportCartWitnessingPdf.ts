@@ -203,7 +203,7 @@ function renderPdf(schedule: CartWitnessingSchedule) {
       5: { cellWidth: 47 },
       6: { cellWidth: 60 },
     },
-    didDrawPage: (data) => {
+    didDrawPage: (_data) => {
       doc.setDrawColor(`#${GREEN}`);
       doc.setLineWidth(0.6);
       doc.line(10, 8, 10, 42);
@@ -258,3 +258,4 @@ export async function createCartWitnessingPdfBlob(schedule: CartWitnessingSchedu
   const { doc } = renderPdf(schedule);
   return doc.output("blob");
 }
+

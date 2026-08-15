@@ -41,7 +41,7 @@ export async function exportCartWitnessingWord(schedule: CartWitnessingSchedule)
   const rows = [...schedule.entries].sort((a, b) => a.date.localeCompare(b.date) || startMinutes(a.time) - startMinutes(b.time) || a.time.localeCompare(b.time));
   const tableRows = [
     new TableRow({ children: headers.map((header) => new TableCell({ children: [new Paragraph({ text: header })] })) }),
-    ...(rows.length ? rows : [{ date: "", time: "", location: "", cart: "", participants: "", captainContact: "", notes: "" }]).map((entry) =>
+    ...(rows.length ? rows : [{ date: "", time: "", location: "", cart: "", participants: "", captainId: "", captainContact: "", notes: "" }]).map((entry) =>
       new TableRow({ children: [
         new TableCell({ children: [new Paragraph(formatDate(entry.date))] }),
         new TableCell({ children: [new Paragraph(entry.time)] }),
@@ -88,3 +88,5 @@ export async function exportCartWitnessingWord(schedule: CartWitnessingSchedule)
   const blob = await Packer.toBlob(doc);
   saveAs(blob, `${safeFilePart(congregationName)}-Cart-Witnessing-${schedule.weekOf}.docx`);
 }
+
+
