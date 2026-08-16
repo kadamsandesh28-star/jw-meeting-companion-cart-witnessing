@@ -15,7 +15,7 @@ import {
   Stack, TextField, ToggleButton, ToggleButtonGroup, Typography,
 } from "@mui/material";
 import {
-  CartWitnessingCaptain, CartWitnessingEntry, CartWitnessingMode, CartWitnessingSchedule,
+  CartWitnessingCaptain, CartWitnessingEntry, CartWitnessingSchedule,
 } from "./models/CartWitnessingSchedule";
 import {
   createEmptyCartWitnessingSchedule, createEntry,
@@ -26,8 +26,8 @@ import { exportCartWitnessingWord } from "./export/exportCartWitnessingWord";
 import { loadCongregationProfile } from "../../settings/storage/congregationProfileStorage";
 
 function shiftIsoDate(value: string, days: number) {
-  const d = new Date(`${value}T00:00:00`);
-  d.setDate(d.getDate() + days);
+  const d = new Date(`${value}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
 
@@ -38,30 +38,33 @@ function mondayOf(value: string) {
   return d.toISOString().slice(0, 10);
 }
 
+function saturdayOf(value: string) {
+  const d = new Date(`${value}T00:00:00`);
+  const day = d.getDay();
+  d.setDate(d.getDate() + (6 - day));
+  return d.toISOString().slice(0, 10);
+}
+
 /** Keep saved schedule rows aligned with the selected week. If an older saved
  * test schedule is exactly one or more whole weeks behind the selected
  * Saturday, migrate its dates forward rather than exporting a mixed week. */
 function normalizeScheduleWeek(schedule: CartWitnessingSchedule) {
-  const targetWeek = mondayOf(schedule.weekOf);
-  const sourceWeeks = [...new Set([
-    ...schedule.entries.map((entry) => mondayOf(entry.date)),
-    ...Object.keys(schedule.dayCaptains ?? {}).map((date) => mondayOf(date)),
-  ])];
+  const targetWeek = schedule.weekOf;
+  if (!schedule.entries.length) return schedule;
+  const weekDates = new Set(getWeekDates(targetWeek));
+  if (schedule.entries.some((entry) => weekDates.has(entry.date))) return schedule;
 
-  let entries = schedule.entries;
-  let dayCaptains = schedule.dayCaptains ?? {};
+  const sourceWeeks = [...new Set(schedule.entries.map((entry) => saturdayOf(entry.date)))];
+  if (sourceWeeks.length !== 1) return schedule;
+  const source = sourceWeeks[0];
+  const deltaDays = Math.round((new Date(`${targetWeek}T00:00:00`).getTime() - new Date(`${source}T00:00:00`).getTime()) / 86400000);
+  if (deltaDays % 7 !== 0 || deltaDays === 0) return schedule;
 
-  if (sourceWeeks.length === 1 && sourceWeeks[0] !== targetWeek) {
-    const sourceWeek = sourceWeeks[0];
-    const deltaDays = Math.round((new Date(`${targetWeek}T00:00:00`).getTime() - new Date(`${sourceWeek}T00:00:00`).getTime()) / 86400000);
-    if (deltaDays % 7 === 0) {
-      entries = schedule.entries.map((entry) => ({ ...entry, date: shiftIsoDate(entry.date, deltaDays) }));
-      dayCaptains = Object.fromEntries(Object.entries(dayCaptains).map(([date, captains]) => [shiftIsoDate(date, deltaDays), captains]));
-    }
-  }
-
-  return { ...schedule, weekOf: targetWeek, entries, dayCaptains, updatedAt: Date.now() };
+  const entries = schedule.entries.map((entry) => ({ ...entry, date: shiftIsoDate(entry.date, deltaDays) }));
+  const dayCaptains = Object.fromEntries(Object.entries(schedule.dayCaptains ?? {}).map(([date, captains]) => [shiftIsoDate(date, deltaDays), captains]));
+  return { ...schedule, entries, dayCaptains, updatedAt: Date.now() };
 }
+
 const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 function formatDate(value: string) {
@@ -105,13 +108,13 @@ function formatClock(totalMinutes: number) {
 
 export default function CartWitnessingPage() {
   const congregationName = loadCongregationProfile().congregationName || "Congregation";
-  const [mode, setMode] = useState<CartWitnessingMode>("weekly");
+  const [mode, setMode] = useState<"weekly" | "weekend">("weekly");
   const [schedule, setSchedule] = useState<CartWitnessingSchedule>(() => {
     const saved = loadCartWitnessingSchedules();
-    const latest = saved.sort((a, b) => b.updatedAt - a.updatedAt)[0] ?? createEmptyCartWitnessingSchedule(mondayOf(new Date().toISOString().slice(0, 10)));
-    return normalizeScheduleWeek({ ...latest, weekOf: mondayOf(new Date().toISOString().slice(0, 10)) });
+    const latest = saved.sort((a, b) => b.updatedAt - a.updatedAt)[0] ?? createEmptyCartWitnessingSchedule();
+    return normalizeScheduleWeek({ ...latest, weekOf: mondayOf(latest.weekOf) });
   });
-  const [dailyDate, setDailyDate] = useState(schedule.weekOf);
+  const [weekendDay, setWeekendDay] = useState<"saturday" | "sunday">("saturday");
 
   const weekDates = useMemo(() => getWeekDates(schedule.weekOf), [schedule.weekOf]);
 
@@ -202,9 +205,7 @@ export default function CartWitnessingPage() {
   }
 
   function updateWeek(value: string) {
-    value = mondayOf(value);
-    setSchedule((current) => { const sourceWeeks = [...new Set([...current.entries.map((entry) => mondayOf(entry.date)), ...Object.keys(current.dayCaptains ?? {}).map((date) => mondayOf(date))])]; if (sourceWeeks.length === 1 && sourceWeeks[0] !== value) { const deltaDays = Math.round((new Date(`${value}T00:00:00`).getTime() - new Date(`${sourceWeeks[0]}T00:00:00`).getTime()) / 86400000); if (deltaDays % 7 === 0) { return { ...current, weekOf: value, entries: current.entries.map((entry) => ({ ...entry, date: shiftIsoDate(entry.date, deltaDays) })), dayCaptains: Object.fromEntries(Object.entries(current.dayCaptains ?? {}).map(([date, captains]) => [shiftIsoDate(date, deltaDays), captains])), updatedAt: Date.now() }; } } return { ...current, weekOf: value, updatedAt: Date.now() }; });
-    setDailyDate(value);
+    setSchedule((current) => ({ ...current, weekOf: value, updatedAt: Date.now() }));
   }
 
   function nextWeekTemplate() {
@@ -212,7 +213,7 @@ export default function CartWitnessingPage() {
     next.setDate(next.getDate() + 7);
     const nextMonday = next.toISOString().slice(0, 10);
     setSchedule(createEmptyCartWitnessingSchedule(nextMonday));
-    setDailyDate(nextMonday);
+    setWeekendDay("saturday");
   }
 
   async function sharePdf() {
@@ -236,6 +237,10 @@ export default function CartWitnessingPage() {
   }
 
   const entriesForDate = (date: string) => schedule.entries.filter((entry) => entry.date === date);
+  const weekendDates = getWeekDates(schedule.weekOf);
+  const saturdayDate = weekendDates[5];
+  const sundayDate = weekendDates[6];
+  const weekendDate = weekendDay === "saturday" ? saturdayDate : sundayDate;
 
   return (
     <Box sx={{ p: { xs: 2, md: 4 } }}>
@@ -249,7 +254,7 @@ export default function CartWitnessingPage() {
                   <Typography variant="h4" fontWeight={800}>{congregationName}</Typography>
                   <Button size="small" variant="outlined" startIcon={<EditRoundedIcon />} href="/settings">Edit</Button>
                 </Stack>
-                <Typography variant="h6" fontWeight={700}>Cart Witnessing — Weekly Schedule</Typography>
+                <Typography variant="h6" fontWeight={700}>Cart Witnessing — {mode === "weekend" ? "Weekend Schedule" : "Weekly Schedule"}</Typography>
                 <Typography color="text.secondary">Reusable daily or weekly schedule — assign up to two day captains by time range.</Typography>
               </Box>
               <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
@@ -259,17 +264,23 @@ export default function CartWitnessingPage() {
             </Stack>
 
             <ToggleButtonGroup exclusive value={mode} onChange={(_, value) => value && setMode(value)} size="small">
-              <ToggleButton value="daily"><TodayRoundedIcon sx={{ mr: 1 }} />Daily</ToggleButton>
+              <ToggleButton value="weekend"><TodayRoundedIcon sx={{ mr: 1 }} />Weekend</ToggleButton>
               <ToggleButton value="weekly"><CalendarMonthRoundedIcon sx={{ mr: 1 }} />Weekly</ToggleButton>
             </ToggleButtonGroup>
 
             <Grid container spacing={2} alignItems="center">
               <Grid size={{ xs: 12, sm: 5 }}>
-                <TextField fullWidth type="date" label="Monday / Week Of" value={schedule.weekOf} onChange={(e) => updateWeek(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
+                <TextField key={schedule.weekOf} fullWidth type="text" label="Week Of (Monday)" defaultValue={schedule.weekOf} onBlur={(e) => updateWeek(e.target.value)} placeholder="YYYY-MM-DD" helperText="Type the Monday date manually" slotProps={{ inputLabel: { shrink: true } }} />
               </Grid>
-              {mode === "daily" && (
-                <Grid size={{ xs: 12, sm: 5 }}>
-                  <TextField fullWidth type="date" label="Daily Schedule Date" value={dailyDate} onChange={(e) => setDailyDate(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
+              {mode === "weekend" && (
+                <Grid size={{ xs: 12, sm: 7 }}>
+                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
+                    <Typography variant="body2" color="text.secondary">Weekend day:</Typography>
+                    <ToggleButtonGroup exclusive value={weekendDay} onChange={(_, value) => value && setWeekendDay(value)} size="small">
+                      <ToggleButton value="saturday">Saturday — {formatDate(saturdayDate)}</ToggleButton>
+                      <ToggleButton value="sunday">Sunday — {formatDate(sundayDate)}</ToggleButton>
+                    </ToggleButtonGroup>
+                  </Stack>
                 </Grid>
               )}
             </Grid>
@@ -284,8 +295,8 @@ export default function CartWitnessingPage() {
           </Stack>
         </Paper>
 
-        {mode === "daily" ? (
-          <DailyView date={dailyDate} entries={entriesForDate(dailyDate)} captains={schedule.dayCaptains[dailyDate] ?? []} onAdd={() => addEntry(dailyDate)} onAddPair={(minutes) => addTimedPair(dailyDate, minutes)} onChange={updateEntry} onAssignCaptain={assignCaptain} onAddCaptain={() => addCaptain(dailyDate)} onUpdateCaptain={updateCaptain} onRemoveCaptain={removeCaptain} onDelete={deleteEntry} />
+        {mode === "weekend" ? (
+          <DailyView date={weekendDate} entries={entriesForDate(weekendDate)} captains={schedule.dayCaptains[weekendDate] ?? []} onAdd={() => addEntry(weekendDate)} onAddPair={(minutes) => addTimedPair(weekendDate, minutes)} onChange={updateEntry} onAssignCaptain={assignCaptain} onAddCaptain={() => addCaptain(weekendDate)} onUpdateCaptain={updateCaptain} onRemoveCaptain={removeCaptain} onDelete={deleteEntry} />
         ) : (
           <WeeklyView dates={weekDates} entries={schedule.entries} dayCaptains={schedule.dayCaptains} onAdd={addEntry} onAddPair={addTimedPair} onChange={updateEntry} onAssignCaptain={assignCaptain} onAddCaptain={addCaptain} onUpdateCaptain={updateCaptain} onRemoveCaptain={removeCaptain} onDelete={deleteEntry} />
         )}
@@ -414,11 +425,4 @@ function EntryCard({ entry, captains, onChange, onAssignCaptain, onDelete }: { e
     </Card>
   );
 }
-
-
-
-
-
-
-
 
