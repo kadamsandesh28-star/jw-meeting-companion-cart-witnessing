@@ -28,21 +28,21 @@ import { loadCongregationProfile } from "../../settings/storage/congregationProf
 function shiftIsoDate(value: string, days: number) {
   const d = new Date(`${value}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
 function mondayOf(value: string) {
   const d = new Date(`${value}T00:00:00`);
   const day = d.getDay();
   d.setDate(d.getDate() - ((day + 6) % 7));
-  return d.toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
 function saturdayOf(value: string) {
   const d = new Date(`${value}T00:00:00`);
   const day = d.getDay();
   d.setDate(d.getDate() + (6 - day));
-  return d.toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
 /** Keep saved schedule rows aligned with the selected week. If an older saved
@@ -77,7 +77,7 @@ function getWeekDates(monday: string) {
   return days.map((_, index) => {
     const d = new Date(date);
     d.setDate(date.getDate() + index);
-    return d.toISOString().slice(0, 10);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   });
 }
 
@@ -425,4 +425,5 @@ function EntryCard({ entry, captains, onChange, onAssignCaptain, onDelete }: { e
     </Card>
   );
 }
+
 
