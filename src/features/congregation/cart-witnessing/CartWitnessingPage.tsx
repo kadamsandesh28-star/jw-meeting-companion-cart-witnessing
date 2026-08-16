@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import PictureAsPdfRoundedIcon from "@mui/icons-material/PictureAsPdfRounded";
@@ -9,11 +9,6 @@ import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import TodayRoundedIcon from "@mui/icons-material/TodayRounded";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import NotificationsNoneRoundedIcon from "@mui/icons-material/NotificationsNoneRounded";
-import EventRoundedIcon from "@mui/icons-material/EventRounded";
-import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
-import PhoneRoundedIcon from "@mui/icons-material/PhoneRounded";
-import PlaceRoundedIcon from "@mui/icons-material/PlaceRounded";
-import InfoRoundedIcon from "@mui/icons-material/InfoRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import PersonAddAltRoundedIcon from "@mui/icons-material/PersonAddAltRounded";
 import {
@@ -164,54 +159,68 @@ async function createArrangementNotificationPdf(data: {
   contact: string;
   note: string;
 }) {
-  const image = await imageUrlToJpegBytes("/arrangement-cart-logo.png");
- 
-  const imageHeight = 590;
-  const imageWidth = Math.min(245, imageHeight * image.width / image.height);
-  const imageX = 28;
-  const imageY = 120;
-  const rightX = 295;
+  // Locked poster artwork. The sample values in the artwork are covered by
+  // white rectangles and replaced with the live values selected in the form.
+  const image = await imageUrlToJpegBytes("/arrangement-notification-poster.png");
+  const pageWidth = 595;
+  const pageHeight = 842;
+
+  const wrapText = (value: string, maxChars: number) => {
+    const clean = value?.trim() || "â€”";
+    if (clean.length <= maxChars) return [clean];
+    const words = clean.split(/\s+/);
+    const result: string[] = [];
+    let line = "";
+    for (const word of words) {
+      const next = line ? `${line} ${word}` : word;
+      if (next.length > maxChars && line) {
+        result.push(line);
+        line = word;
+      } else {
+        line = next;
+      }
+    }
+    if (line) result.push(line);
+    return result.slice(0, 2);
+  };
+
+  const congregationName = loadCongregationProfile().congregationName || "Congregation";
+  const arrangementLines = wrapText(data.arrangement, 30);
+  const brotherLines = wrapText(data.assignedBrother, 27);
 
   const lines = [
-    "BT",
-    "/F1 20 Tf",
-    "0.03 0.12 0.35 rg",
-    `1 0 0 1 ${rightX} 760 Tm`,
-    "(ARRANGEMENT NOTIFICATION) Tj",
-    "/F1 12 Tf",
-    `1 0 0 1 ${rightX + 55} 735 Tm`,
-    "(CART WITNESSING) Tj",
-    "0 0 0 RG",
-    "1 w",
-    `45 715 m 550 715 l S`,
-    "/F1 10 Tf",
-    `1 0 0 1 ${rightX} 675 Tm`,
-    `(Date        ${pdfEscape(data.date)}) Tj`,
-    `1 0 0 1 ${rightX} 640 Tm`,
-    `(Time Slot   ${pdfEscape(data.time)}) Tj`,
-    `1 0 0 1 ${rightX} 605 Tm`,
-    `(Arrangement ${pdfEscape(data.arrangement)}) Tj`,
-    `1 0 0 1 ${rightX} 570 Tm`,
-    `(Assigned Brother ${pdfEscape(data.assignedBrother)}) Tj`,
-    `1 0 0 1 ${rightX} 535 Tm`,
-    `(Contact Number   ${pdfEscape(data.contact)}) Tj`,
-    "0.03 0.12 0.35 rg",
-    "1 w",
-    `295 500 m 550 500 l S`,
-    "/F1 11 Tf",
-    `1 0 0 1 ${rightX} 455 Tm`,
-    "(Please inform the assigned brother of your name)",
-    "Tj",
-    `1 0 0 1 ${rightX + 35} 432 Tm`,
-    "(regarding this arrangement and time slot.) Tj",
-    "/F1 9 Tf",
-    `1 0 0 1 ${rightX + 20} 395 Tm`,
-    "(Thank you for your fine cooperation in the ministry.) Tj",
-    "ET",
     "q",
-    `${imageWidth} 0 0 ${imageHeight} ${imageX} ${imageY} cm`,
+    `${pageWidth} 0 0 ${pageHeight} 0 0 cm`,
     "/Im1 Do",
     "Q",
+    // Cover only the sample values, leaving the approved labels, icons,
+    // dividers and all instructional artwork untouched.
+    "1 1 1 rg",
+    "402 596 181 31 re f",
+    "402 505 181 31 re f",
+    "402 414 181 38 re f",
+    "402 324 181 38 re f",
+    "402 233 181 34 re f",
+    // Congregation name in the clean space below the Cart Witnessing banner.
+    "0.03 0.12 0.35 rg",
+    "/F1 9 Tf",
+    `1 0 0 1 205 650 Tm (${pdfEscape(congregationName)}) Tj`,
+    // Dynamic values.
+    "/F1 10 Tf",
+    `1 0 0 1 410 616 Tm (${pdfEscape(data.date || "â€”")}) Tj`,
+    `1 0 0 1 410 525 Tm (${pdfEscape(data.time || "â€”")}) Tj`,
+    "/F1 9 Tf",
+    ...arrangementLines.map((line, index) => `1 0 0 1 410 ${index === 0 ? 439 : 427} Tm (${pdfEscape(line)}) Tj`),
+    "/F1 10 Tf",
+    ...brotherLines.map((line, index) => `1 0 0 1 410 ${index === 0 ? 349 : 337} Tm (${pdfEscape(line)}) Tj`),
+    `1 0 0 1 410 247 Tm (${pdfEscape(data.contact || "â€”")}) Tj`,
+    ...(data.note?.trim()
+      ? [
+          "/F1 7 Tf",
+          "0.12 0.23 0.36 rg",
+          `1 0 0 1 92 92 Tm (Additional note: ${pdfEscape(data.note.trim().slice(0, 110))}) Tj`,
+        ]
+      : []),
   ].join("\n");
 
   const imageObject = concatBytes([
@@ -222,13 +231,14 @@ async function createArrangementNotificationPdf(data: {
     toLatin1Bytes("\nendstream"),
   ]);
 
+  const contentBytes = toLatin1Bytes(lines);
   const objects: Uint8Array[] = [
     toLatin1Bytes("<< /Type /Catalog /Pages 2 0 R >>"),
     toLatin1Bytes("<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
     toLatin1Bytes("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> /XObject << /Im1 5 0 R >> >> /Contents 6 0 R >>"),
     toLatin1Bytes("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"),
     imageObject,
-    toLatin1Bytes(`<< /Length ${lines.length ? new TextEncoder().encode(lines).length : 0} >>\nstream\n${lines}\nendstream`),
+    toLatin1Bytes(`<< /Length ${contentBytes.length} >>\nstream\n${lines}\nendstream`),
   ];
 
   const header = toLatin1Bytes("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n");
@@ -269,8 +279,8 @@ export default function CartWitnessingPage() {
   });
   const [weekendDay, setWeekendDay] = useState<"saturday" | "sunday">("saturday");
   const [arrangementDate, setArrangementDate] = useState("");
-  const [arrangementTime, setArrangementTime] = useState("9:00 AM – 10:00 AM");
-  const [arrangement, setArrangement] = useState("Cart Witnessing – Residential");
+  const [arrangementTime, setArrangementTime] = useState("9:00 AM â€“ 10:00 AM");
+  const [arrangement, setArrangement] = useState("Cart Witnessing â€“ Residential");
   const [assignedBrother, setAssignedBrother] = useState("");
   const [arrangementContact, setArrangementContact] = useState("");
   const [arrangementNote, setArrangementNote] = useState("");
@@ -289,9 +299,9 @@ export default function CartWitnessingPage() {
       if (entry.time.trim()) values.add(entry.time.trim());
     }
     for (const captain of arrangementCaptains) {
-      if (captain.from || captain.to) values.add(`${captain.from || "9:00 AM"} – ${captain.to || "10:00 AM"}`);
+      if (captain.from || captain.to) values.add(`${captain.from || "9:00 AM"} â€“ ${captain.to || "10:00 AM"}`);
     }
-    if (!values.size) values.add("9:00 AM – 10:00 AM");
+    if (!values.size) values.add("9:00 AM â€“ 10:00 AM");
     return [...values];
   }, [arrangementDate, arrangementCaptains, schedule.entries]);
 
@@ -300,7 +310,7 @@ export default function CartWitnessingPage() {
     const firstCaptain = captains[0];
     const firstEntry = schedule.entries.find((entry) => entry.date === date && entry.time.trim());
     setArrangementDate(date);
-    setArrangementTime(firstEntry?.time || (firstCaptain?.from || firstCaptain?.to ? `${firstCaptain.from || "9:00 AM"} – ${firstCaptain.to || "10:00 AM"}` : "9:00 AM – 10:00 AM"));
+    setArrangementTime(firstEntry?.time || (firstCaptain?.from || firstCaptain?.to ? `${firstCaptain.from || "9:00 AM"} â€“ ${firstCaptain.to || "10:00 AM"}` : "9:00 AM â€“ 10:00 AM"));
     setAssignedBrother(firstCaptain?.name || "");
     setArrangementContact(firstCaptain?.contact || "");
   }
@@ -313,7 +323,7 @@ export default function CartWitnessingPage() {
     const firstCaptain = captains[0];
     const firstEntry = schedule.entries.find((entry) => entry.date === nextDate && entry.time.trim());
     setArrangementDate(nextDate);
-    setArrangementTime(firstEntry?.time || (firstCaptain?.from || firstCaptain?.to ? `${firstCaptain.from || "9:00 AM"} – ${firstCaptain.to || "10:00 AM"}` : "9:00 AM – 10:00 AM"));
+    setArrangementTime(firstEntry?.time || (firstCaptain?.from || firstCaptain?.to ? `${firstCaptain.from || "9:00 AM"} â€“ ${firstCaptain.to || "10:00 AM"}` : "9:00 AM â€“ 10:00 AM"));
     setAssignedBrother(firstCaptain?.name || "");
     setArrangementContact(firstCaptain?.contact || "");
   }, [arrangementDateOptions, arrangementDate, schedule.dayCaptains, schedule.entries]);
@@ -339,7 +349,7 @@ export default function CartWitnessingPage() {
         entries: current.entries.map((item) => item.id === entryId ? {
           ...item,
           captainId,
-          captainContact: captain ? `${captain.name}${captain.contact ? ` ┬╖ ${captain.contact}` : ""}` : item.captainContact,
+          captainContact: captain ? `${captain.name}${captain.contact ? ` â”¬â•– ${captain.contact}` : ""}` : item.captainContact,
         } : item),
       };
     });
@@ -518,7 +528,7 @@ export default function CartWitnessingPage() {
                   <Button size="small" variant="outlined" startIcon={<EditRoundedIcon />} href="/settings">Edit</Button>
                 </Stack>
                 <Typography variant="h6" fontWeight={700}>Cart Witnessing Schedule</Typography>
-                <Typography color="text.secondary">Reusable daily or weekly schedule ΓÇö assign up to two day captains by time range.</Typography>
+                <Typography color="text.secondary">Reusable daily or weekly schedule — assign up to two day captains by time range.</Typography>
               </Box>
               <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                 <Chip icon={<CalendarMonthRoundedIcon />} label={`Week of ${formatDate(schedule.weekOf)}`} />
@@ -540,8 +550,8 @@ export default function CartWitnessingPage() {
                   <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
                     <Typography variant="body2" color="text.secondary">Weekend day:</Typography>
                     <ToggleButtonGroup exclusive value={weekendDay} onChange={(_, value) => value && setWeekendDay(value)} size="small">
-                      <ToggleButton value="saturday">Saturday ΓÇö {formatDate(saturdayDate)}</ToggleButton>
-                      <ToggleButton value="sunday">Sunday ΓÇö {formatDate(sundayDate)}</ToggleButton>
+                      <ToggleButton value="saturday">Saturday Î“Ã‡Ã¶ {formatDate(saturdayDate)}</ToggleButton>
+                      <ToggleButton value="sunday">Sunday Î“Ã‡Ã¶ {formatDate(sundayDate)}</ToggleButton>
                     </ToggleButtonGroup>
                   </Stack>
                 </Grid>
@@ -635,9 +645,9 @@ function ArrangementNotification({
 }) {
   const dateLabel = date ? formatDate(date) : "Select a date";
   const arrangementOptions = [
-    "Cart Witnessing – Residential",
-    "Cart Witnessing – Public",
-    "Cart Witnessing – Special Arrangement",
+    "Cart Witnessing â€“ Residential",
+    "Cart Witnessing â€“ Public",
+    "Cart Witnessing â€“ Special Arrangement",
   ];
 
   return (
@@ -703,42 +713,18 @@ function ArrangementNotification({
         </Stack>
 
         <Paper variant="outlined" sx={{ p: { xs: 1.5, md: 2 }, borderRadius: 2.5, overflow: "hidden" }}>
-          <Typography variant="subtitle2" fontWeight={800} color="primary.main" sx={{ mb: 1.5 }}>Preview (PDF)</Typography>
-          <Card variant="outlined" sx={{ borderRadius: 2.5, overflow: "hidden", maxWidth: 980, mx: "auto" }}>
-            <Grid container>
-              <Grid size={{ xs: 12, md: 4 }} sx={{ minHeight: 360, bgcolor: "#f7f7f7" }}>
-                <Box
-                  component="img"
-                  src="/arrangement-cart-logo.png"
-                  alt="Public witnessing cart design"
-                  sx={{ width: "100%", height: "100%", minHeight: 360, objectFit: "cover", display: "block" }}
-                />
-              </Grid>
-              <Grid size={{ xs: 12, md: 8 }}>
-                <CardContent sx={{ p: { xs: 2, md: 3 } }}>
-                  <Typography align="center" variant="h5" fontWeight={900} color="#10265c">ARRANGEMENT NOTIFICATION</Typography>
-                  <Typography align="center" fontWeight={800} color="#10265c" sx={{ mt: 0.5 }}>CART WITNESSING</Typography>
-                  <Divider sx={{ my: 2, borderColor: "primary.main" }} />
-                  <PreviewRow icon={<EventRoundedIcon />} label="Date" value={dateLabel} />
-                  <PreviewRow icon={<AccessTimeRoundedIcon />} label="Time Slot" value={time || "—"} />
-                  <PreviewRow icon={<PlaceRoundedIcon />} label="Arrangement" value={arrangement || "—"} />
-                  <PreviewRow icon={<PersonRoundedIcon />} label="Assigned Brother" value={assignedBrother || "—"} />
-                  <PreviewRow icon={<PhoneRoundedIcon />} label="Contact Number" value={contact || "—"} />
-                  <Divider sx={{ my: 2, borderColor: "primary.main" }} />
-                  <Stack alignItems="center" spacing={1}>
-                    <InfoRoundedIcon color="primary" />
-                    <Typography align="center" fontWeight={800} color="#10265c">
-                      Please inform the assigned brother of your name regarding this arrangement and time slot.
-                    </Typography>
-                    {note && <Typography align="center" variant="body2" color="text.secondary">{note}</Typography>}
-                    <Typography align="center" variant="body2" fontStyle="italic" color="primary.main">
-                      Thank you for your fine cooperation in the ministry.
-                    </Typography>
-                  </Stack>
-                </CardContent>
-              </Grid>
-            </Grid>
+          <Typography variant="subtitle2" fontWeight={800} color="primary.main" sx={{ mb: 1.5 }}>Preview (Final PDF Design)</Typography>
+          <Card variant="outlined" sx={{ borderRadius: 2.5, overflow: "hidden", maxWidth: 700, mx: "auto", bgcolor: "#fff" }}>
+            <Box
+              component="img"
+              src="/arrangement-notification-poster.png"
+              alt="Arrangement Notification final PDF design"
+              sx={{ width: "100%", height: "auto", display: "block" }}
+            />
           </Card>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1, textAlign: "center" }}>
+            The PDF uses this locked design and overlays the selected date, time, arrangement, assigned brother and contact number.
+          </Typography>
         </Paper>
 
         <Paper sx={{ p: 1.5, bgcolor: "primary.50", borderRadius: 2 }} elevation={0}>
@@ -751,15 +737,6 @@ function ArrangementNotification({
   );
 }
 
-function PreviewRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return (
-    <Stack direction="row" spacing={1.5} alignItems="center" sx={{ py: 1, borderBottom: "1px solid", borderColor: "divider" }}>
-      <Box sx={{ color: "primary.main", display: "flex" }}>{icon}</Box>
-      <Typography sx={{ minWidth: { xs: 110, sm: 145 }, fontWeight: 500 }}>{label}</Typography>
-      <Typography sx={{ fontWeight: 600, overflowWrap: "anywhere" }}>{value}</Typography>
-    </Stack>
-  );
-}
 
 type ViewProps = {
   date: string;
@@ -800,7 +777,7 @@ function DaySection({ date, monday, entries, captains, onAdd, onAddPair, onChang
         <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" alignItems={{ xs: "stretch", md: "center" }} spacing={1.5}>
           <Box>
             <Typography variant="h6" fontWeight={800}>{formatDate(date)}</Typography>
-            {monday && <Chip size="small" label="Monday ΓÇö Week Start" color="warning" sx={{ mt: 0.5 }} />}
+            {monday && <Chip size="small" label="Monday Î“Ã‡Ã¶ Week Start" color="warning" sx={{ mt: 0.5 }} />}
           </Box>
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap justifyContent="flex-end">
             <Button size="small" variant="outlined" startIcon={<PersonAddAltRoundedIcon />} onClick={onAddCaptain} disabled={captains.length >= 2}>{captains.length >= 2 ? "2 Captains Added" : `Add Captain (${captains.length}/2)`}</Button>
@@ -863,13 +840,13 @@ function EntryCard({ entry, captains, onChange, onAssignCaptain, onDelete }: { e
             <Button color="error" size="small" startIcon={<DeleteOutlineRoundedIcon />} onClick={() => onDelete(entry.id)}>Remove</Button>
           </Stack>
           <Grid container spacing={2}>
-            <Grid size={{ xs: 12, sm: 4, md: 2 }}><TextField fullWidth label="Time" value={entry.time} onChange={field("time")} placeholder="9:00ΓÇô9:30" /></Grid>
+            <Grid size={{ xs: 12, sm: 4, md: 2 }}><TextField fullWidth label="Time" value={entry.time} onChange={field("time")} placeholder="9:00Î“Ã‡Ã´9:30" /></Grid>
             <Grid size={{ xs: 12, sm: 8, md: 4 }}><TextField fullWidth label="Location" value={entry.location} onChange={field("location")} /></Grid>
             <Grid size={{ xs: 12, sm: 4, md: 2 }}><TextField fullWidth label="Cart" value={entry.cart} onChange={field("cart")} placeholder="Cart 1" /></Grid>
             <Grid size={{ xs: 12, sm: 8, md: 4 }}>
               <Select fullWidth displayEmpty value={entry.captainId ?? ""} onChange={(e) => onAssignCaptain(entry.id, e.target.value)}>
                 <MenuItem value=""><em>No day captain</em></MenuItem>
-                {captains.map((captain, index) => <MenuItem key={captain.id} value={captain.id}>{captain.name || `Captain ${index + 1}`} {captain.from || captain.to ? `(${captain.from || "?"}ΓÇô${captain.to || "?"})` : ""}</MenuItem>)}
+                {captains.map((captain, index) => <MenuItem key={captain.id} value={captain.id}>{captain.name || `Captain ${index + 1}`} {captain.from || captain.to ? `(${captain.from || "?"}Î“Ã‡Ã´${captain.to || "?"})` : ""}</MenuItem>)}
               </Select>
             </Grid>
             <Grid size={{ xs: 12, md: 6 }}><TextField fullWidth label="Participants" value={entry.participants} onChange={field("participants")} placeholder="Names" /></Grid>
@@ -881,6 +858,7 @@ function EntryCard({ entry, captains, onChange, onAssignCaptain, onDelete }: { e
     </Card>
   );
 }
+
 
 
 
