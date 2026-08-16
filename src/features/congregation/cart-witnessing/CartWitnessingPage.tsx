@@ -421,7 +421,7 @@ export default function CartWitnessingPage() {
     const blob = await createCartWitnessingPdfBlob(schedule);
     const file = new File([blob], `${congregationName.replace(/[^a-z0-9]+/gi, "-")}-Cart-Witnessing-${schedule.weekOf}.pdf`, { type: "application/pdf" });
     if (navigator.share && navigator.canShare?.({ files: [file] })) {
-      await navigator.share({ title: "Cart Witnessing Weekly Schedule", files: [file] });
+      await navigator.share({ title: "Cart Witnessing Schedule", files: [file] });
       return;
     }
     const url = URL.createObjectURL(blob);
@@ -517,7 +517,7 @@ export default function CartWitnessingPage() {
                   <Typography variant="h4" fontWeight={800}>{congregationName}</Typography>
                   <Button size="small" variant="outlined" startIcon={<EditRoundedIcon />} href="/settings">Edit</Button>
                 </Stack>
-                <Typography variant="h6" fontWeight={700}>Cart Witnessing ΓÇö {mode === "weekend" ? "Weekend Schedule" : "Weekly Schedule"}</Typography>
+                <Typography variant="h6" fontWeight={700}>Cart Witnessing Schedule</Typography>
                 <Typography color="text.secondary">Reusable daily or weekly schedule ΓÇö assign up to two day captains by time range.</Typography>
               </Box>
               <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
@@ -881,5 +881,6 @@ function EntryCard({ entry, captains, onChange, onAssignCaptain, onDelete }: { e
     </Card>
   );
 }
+
 
 
