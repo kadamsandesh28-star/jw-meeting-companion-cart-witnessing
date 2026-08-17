@@ -166,7 +166,7 @@ async function createArrangementNotificationPdf(data: {
   const pageHeight = 842;
 
   const wrapText = (value: string, maxChars: number) => {
-    const clean = value?.trim() || "â€”";
+    const clean = value?.trim() || "—";
     if (clean.length <= maxChars) return [clean];
     const words = clean.split(/\s+/);
     const result: string[] = [];
@@ -207,13 +207,13 @@ async function createArrangementNotificationPdf(data: {
     `1 0 0 1 205 650 Tm (${pdfEscape(congregationName)}) Tj`,
     // Dynamic values.
     "/F1 10 Tf",
-    `1 0 0 1 410 616 Tm (${pdfEscape(data.date || "â€”")}) Tj`,
-    `1 0 0 1 410 525 Tm (${pdfEscape(data.time || "â€”")}) Tj`,
+    `1 0 0 1 410 616 Tm (${pdfEscape(data.date || "—")}) Tj`,
+    `1 0 0 1 410 525 Tm (${pdfEscape(data.time || "—")}) Tj`,
     "/F1 9 Tf",
     ...arrangementLines.map((line, index) => `1 0 0 1 410 ${index === 0 ? 439 : 427} Tm (${pdfEscape(line)}) Tj`),
     "/F1 10 Tf",
     ...brotherLines.map((line, index) => `1 0 0 1 410 ${index === 0 ? 349 : 337} Tm (${pdfEscape(line)}) Tj`),
-    `1 0 0 1 410 247 Tm (${pdfEscape(data.contact || "â€”")}) Tj`,
+    `1 0 0 1 410 247 Tm (${pdfEscape(data.contact || "—")}) Tj`,
     ...(data.note?.trim()
       ? [
           "/F1 7 Tf",
@@ -279,8 +279,8 @@ export default function CartWitnessingPage() {
   });
   const [weekendDay, setWeekendDay] = useState<"saturday" | "sunday">("saturday");
   const [arrangementDate, setArrangementDate] = useState("");
-  const [arrangementTime, setArrangementTime] = useState("9:00 AM â€“ 10:00 AM");
-  const [arrangement, setArrangement] = useState("Cart Witnessing â€“ Residential");
+  const [arrangementTime, setArrangementTime] = useState("9:00 AM – 10:00 AM");
+  const [arrangement, setArrangement] = useState("Cart Witnessing – Residential");
   const [assignedBrother, setAssignedBrother] = useState("");
   const [arrangementContact, setArrangementContact] = useState("");
   const [arrangementNote, setArrangementNote] = useState("");
@@ -299,9 +299,9 @@ export default function CartWitnessingPage() {
       if (entry.time.trim()) values.add(entry.time.trim());
     }
     for (const captain of arrangementCaptains) {
-      if (captain.from || captain.to) values.add(`${captain.from || "9:00 AM"} â€“ ${captain.to || "10:00 AM"}`);
+      if (captain.from || captain.to) values.add(`${captain.from || "9:00 AM"} – ${captain.to || "10:00 AM"}`);
     }
-    if (!values.size) values.add("9:00 AM â€“ 10:00 AM");
+    if (!values.size) values.add("9:00 AM – 10:00 AM");
     return [...values];
   }, [arrangementDate, arrangementCaptains, schedule.entries]);
 
@@ -310,7 +310,7 @@ export default function CartWitnessingPage() {
     const firstCaptain = captains[0];
     const firstEntry = schedule.entries.find((entry) => entry.date === date && entry.time.trim());
     setArrangementDate(date);
-    setArrangementTime(firstEntry?.time || (firstCaptain?.from || firstCaptain?.to ? `${firstCaptain.from || "9:00 AM"} â€“ ${firstCaptain.to || "10:00 AM"}` : "9:00 AM â€“ 10:00 AM"));
+    setArrangementTime(firstEntry?.time || (firstCaptain?.from || firstCaptain?.to ? `${firstCaptain.from || "9:00 AM"} – ${firstCaptain.to || "10:00 AM"}` : "9:00 AM – 10:00 AM"));
     setAssignedBrother(firstCaptain?.name || "");
     setArrangementContact(firstCaptain?.contact || "");
   }
@@ -323,7 +323,7 @@ export default function CartWitnessingPage() {
     const firstCaptain = captains[0];
     const firstEntry = schedule.entries.find((entry) => entry.date === nextDate && entry.time.trim());
     setArrangementDate(nextDate);
-    setArrangementTime(firstEntry?.time || (firstCaptain?.from || firstCaptain?.to ? `${firstCaptain.from || "9:00 AM"} â€“ ${firstCaptain.to || "10:00 AM"}` : "9:00 AM â€“ 10:00 AM"));
+    setArrangementTime(firstEntry?.time || (firstCaptain?.from || firstCaptain?.to ? `${firstCaptain.from || "9:00 AM"} – ${firstCaptain.to || "10:00 AM"}` : "9:00 AM – 10:00 AM"));
     setAssignedBrother(firstCaptain?.name || "");
     setArrangementContact(firstCaptain?.contact || "");
   }, [arrangementDateOptions, arrangementDate, schedule.dayCaptains, schedule.entries]);
@@ -349,7 +349,7 @@ export default function CartWitnessingPage() {
         entries: current.entries.map((item) => item.id === entryId ? {
           ...item,
           captainId,
-          captainContact: captain ? `${captain.name}${captain.contact ? ` â”¬â•– ${captain.contact}` : ""}` : item.captainContact,
+          captainContact: captain ? `${captain.name}${captain.contact ? `  —  ${captain.contact}` : ""}` : item.captainContact,
         } : item),
       };
     });
@@ -550,8 +550,8 @@ export default function CartWitnessingPage() {
                   <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
                     <Typography variant="body2" color="text.secondary">Weekend day:</Typography>
                     <ToggleButtonGroup exclusive value={weekendDay} onChange={(_, value) => value && setWeekendDay(value)} size="small">
-                      <ToggleButton value="saturday">Saturday Î“Ã‡Ã¶ {formatDate(saturdayDate)}</ToggleButton>
-                      <ToggleButton value="sunday">Sunday Î“Ã‡Ã¶ {formatDate(sundayDate)}</ToggleButton>
+                      <ToggleButton value="saturday">Saturday — {formatDate(saturdayDate)}</ToggleButton>
+                      <ToggleButton value="sunday">Sunday — {formatDate(sundayDate)}</ToggleButton>
                     </ToggleButtonGroup>
                   </Stack>
                 </Grid>
@@ -645,9 +645,9 @@ function ArrangementNotification({
 }) {
   const dateLabel = date ? formatDate(date) : "Select a date";
   const arrangementOptions = [
-    "Cart Witnessing â€“ Residential",
-    "Cart Witnessing â€“ Public",
-    "Cart Witnessing â€“ Special Arrangement",
+    "Cart Witnessing – Residential",
+    "Cart Witnessing – Public",
+    "Cart Witnessing – Special Arrangement",
   ];
 
   return (
@@ -777,7 +777,7 @@ function DaySection({ date, monday, entries, captains, onAdd, onAddPair, onChang
         <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" alignItems={{ xs: "stretch", md: "center" }} spacing={1.5}>
           <Box>
             <Typography variant="h6" fontWeight={800}>{formatDate(date)}</Typography>
-            {monday && <Chip size="small" label="Monday Î“Ã‡Ã¶ Week Start" color="warning" sx={{ mt: 0.5 }} />}
+            {monday && <Chip size="small" label="Monday — Week Start" color="warning" sx={{ mt: 0.5 }} />}
           </Box>
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap justifyContent="flex-end">
             <Button size="small" variant="outlined" startIcon={<PersonAddAltRoundedIcon />} onClick={onAddCaptain} disabled={captains.length >= 2}>{captains.length >= 2 ? "2 Captains Added" : `Add Captain (${captains.length}/2)`}</Button>
@@ -840,13 +840,13 @@ function EntryCard({ entry, captains, onChange, onAssignCaptain, onDelete }: { e
             <Button color="error" size="small" startIcon={<DeleteOutlineRoundedIcon />} onClick={() => onDelete(entry.id)}>Remove</Button>
           </Stack>
           <Grid container spacing={2}>
-            <Grid size={{ xs: 12, sm: 4, md: 2 }}><TextField fullWidth label="Time" value={entry.time} onChange={field("time")} placeholder="9:00Î“Ã‡Ã´9:30" /></Grid>
+            <Grid size={{ xs: 12, sm: 4, md: 2 }}><TextField fullWidth label="Time" value={entry.time} onChange={field("time")} placeholder="9:00 – 9:30" /></Grid>
             <Grid size={{ xs: 12, sm: 8, md: 4 }}><TextField fullWidth label="Location" value={entry.location} onChange={field("location")} /></Grid>
             <Grid size={{ xs: 12, sm: 4, md: 2 }}><TextField fullWidth label="Cart" value={entry.cart} onChange={field("cart")} placeholder="Cart 1" /></Grid>
             <Grid size={{ xs: 12, sm: 8, md: 4 }}>
               <Select fullWidth displayEmpty value={entry.captainId ?? ""} onChange={(e) => onAssignCaptain(entry.id, e.target.value)}>
                 <MenuItem value=""><em>No day captain</em></MenuItem>
-                {captains.map((captain, index) => <MenuItem key={captain.id} value={captain.id}>{captain.name || `Captain ${index + 1}`} {captain.from || captain.to ? `(${captain.from || "?"}Î“Ã‡Ã´${captain.to || "?"})` : ""}</MenuItem>)}
+                {captains.map((captain, index) => <MenuItem key={captain.id} value={captain.id}>{captain.name || `Captain ${index + 1}`} {captain.from || captain.to ? `(${captain.from || "?"} – ${captain.to || "?"})` : ""}</MenuItem>)}
               </Select>
             </Grid>
             <Grid size={{ xs: 12, md: 6 }}><TextField fullWidth label="Participants" value={entry.participants} onChange={field("participants")} placeholder="Names" /></Grid>
