@@ -137,6 +137,7 @@ async function createArrangementNotificationPdf(data: {
   date: string;
   time: string;
   arrangement: string;
+  location: string;
   assignedBrother: string;
   contact: string;
   note: string;
@@ -167,6 +168,7 @@ async function createArrangementNotificationPdf(data: {
   };
 
   const arrangementLines = wrapText(data.arrangement, 30);
+  const locationLines = wrapText(data.location, 30);
   const brotherLines = wrapText(data.assignedBrother, 27);
   const noteLine = data.note?.trim() ? `Additional note: ${data.note.trim()}` : "";
 
@@ -211,93 +213,100 @@ async function createArrangementNotificationPdf(data: {
     `${white} rg /F2 14 Tf 1 0 0 1 226 686 Tm (CART WITNESSING) Tj`,
 
     // Detail rows.
-    roundedRect(42, 586, 511, 58, white),
-    roundedRect(42, 520, 511, 58, white),
-    roundedRect(42, 454, 511, 58, white),
-    roundedRect(42, 388, 511, 58, white),
-    roundedRect(42, 322, 511, 58, white),
+    roundedRect(42, 598, 511, 54, white),
+    roundedRect(42, 536, 511, 54, white),
+    roundedRect(42, 474, 511, 54, white),
+    roundedRect(42, 412, 511, 54, white),
+    roundedRect(42, 350, 511, 54, white),
+    roundedRect(42, 288, 511, 54, white),
 
     // Row dividers.
-    line(42, 586, 553, 586),
-    line(42, 520, 553, 520),
-    line(42, 454, 553, 454),
-    line(42, 388, 553, 388),
-    line(42, 322, 553, 322),
+    line(42, 598, 553, 598),
+    line(42, 536, 553, 536),
+    line(42, 474, 553, 474),
+    line(42, 412, 553, 412),
+    line(42, 350, 553, 350),
+    line(42, 288, 553, 288),
 
     // Simple letter icons: deliberately plain, with no Bible/logo.
-    circle(70, 615, 17),
-    circle(70, 549, 17),
-    circle(70, 483, 17),
-    circle(70, 417, 17),
-    circle(70, 351, 17),
-    `${white} rg /F2 10 Tf 1 0 0 1 66 611 Tm (D) Tj`,
-    `${white} rg /F2 10 Tf 1 0 0 1 66 545 Tm (T) Tj`,
-    `${white} rg /F2 10 Tf 1 0 0 1 66 479 Tm (A) Tj`,
-    `${white} rg /F2 10 Tf 1 0 0 1 66 413 Tm (B) Tj`,
-    `${white} rg /F2 10 Tf 1 0 0 1 66 347 Tm (C) Tj`,
+    circle(70, 625, 17),
+    circle(70, 563, 17),
+    circle(70, 501, 17),
+    circle(70, 439, 17),
+    circle(70, 377, 17),
+    circle(70, 315, 17),
+    `${white} rg /F2 10 Tf 1 0 0 1 66 621 Tm (D) Tj`,
+    `${white} rg /F2 10 Tf 1 0 0 1 66 559 Tm (T) Tj`,
+    `${white} rg /F2 10 Tf 1 0 0 1 66 497 Tm (A) Tj`,
+    `${white} rg /F2 10 Tf 1 0 0 1 66 435 Tm (L) Tj`,
+    `${white} rg /F2 10 Tf 1 0 0 1 66 373 Tm (B) Tj`,
+    `${white} rg /F2 10 Tf 1 0 0 1 66 311 Tm (C) Tj`,
 
     // Labels.
-    textAt(105, 611, 10, "DATE", "F2"),
-    textAt(105, 545, 10, "TIME SLOT", "F2"),
-    textAt(105, 479, 10, "ARRANGEMENT", "F2"),
-    textAt(105, 413, 10, "ASSIGNED BROTHER", "F2"),
-    textAt(105, 347, 10, "CONTACT NUMBER", "F2"),
+    textAt(105, 621, 10, "DATE", "F2"),
+    textAt(105, 559, 10, "TIME SLOT", "F2"),
+    textAt(105, 497, 10, "ARRANGEMENT", "F2"),
+    textAt(105, 435, 10, "LOCATION", "F2"),
+    textAt(105, 373, 10, "ASSIGNED BROTHER", "F2"),
+    textAt(105, 311, 10, "CONTACT NUMBER", "F2"),
 
     // Gold separators.
-    `${gold} RG 1.1 w 194 600 m 194 630 l S`,
-    `${gold} RG 1.1 w 194 534 m 194 564 l S`,
-    `${gold} RG 1.1 w 194 468 m 194 498 l S`,
-    `${gold} RG 1.1 w 194 402 m 194 432 l S`,
-    `${gold} RG 1.1 w 194 336 m 194 366 l S`,
+    `${gold} RG 1.1 w 194 610 m 194 640 l S`,
+    `${gold} RG 1.1 w 194 548 m 194 578 l S`,
+    `${gold} RG 1.1 w 194 486 m 194 516 l S`,
+    `${gold} RG 1.1 w 194 424 m 194 454 l S`,
+    `${gold} RG 1.1 w 194 362 m 194 392 l S`,
+    `${gold} RG 1.1 w 194 300 m 194 330 l S`,
 
     // Values.
-    textAt(220, 611, 10, data.date || "-", "F1"),
-    textAt(220, 545, 10, data.time || "-", "F1"),
-    ...arrangementLines.map((value, index) => textAt(220, index === 0 ? 479 : 466, 9, value, "F1")),
-    ...brotherLines.map((value, index) => textAt(220, index === 0 ? 413 : 400, 10, value, "F1")),
-    textAt(220, 347, 10, data.contact || "-", "F1"),
+    textAt(220, 621, 10, data.date || "-", "F1"),
+    textAt(220, 559, 10, data.time || "-", "F1"),
+    ...arrangementLines.map((value, index) => textAt(220, index === 0 ? 497 : 484, 9, value, "F1")),
+    ...locationLines.map((value, index) => textAt(220, index === 0 ? 435 : 422, 9, value, "F1")),
+    ...brotherLines.map((value, index) => textAt(220, index === 0 ? 373 : 360, 10, value, "F1")),
+    textAt(220, 311, 10, data.contact || "-", "F1"),
 
     // Please Note panel.
-    `${lightBlue} rg 42 94 511 200 re f`,
-    `${navy} rg 42 266 511 28 re f`,
-    `${gold} rg 190 266 9 28 re f`,
-    `${white} rg /F2 13 Tf 1 0 0 1 61 275 Tm (PLEASE NOTE) Tj`,
+    `${lightBlue} rg 42 62 511 200 re f`,
+    `${navy} rg 42 234 511 28 re f`,
+    `${gold} rg 190 234 9 28 re f`,
+    `${white} rg /F2 13 Tf 1 0 0 1 61 243 Tm (PLEASE NOTE) Tj`,
 
     // Note point 1.
-    circle(70, 232, 12),
-    `${white} rg /F2 9 Tf 1 0 0 1 66 229 Tm (1) Tj`,
-    `${darkText} rg /F1 8.5 Tf 1 0 0 1 95 239 Tm (If several brothers and sisters sign up, you may be asked) Tj`,
-    `${darkText} rg /F1 8.5 Tf 1 0 0 1 95 226 Tm (to serve for only 30 minutes.) Tj`,
-    `${darkText} rg /F1 8.5 Tf 1 0 0 1 95 213 Tm (Please check your schedule accordingly.) Tj`,
-    line(95, 202, 535, 202, 0.6, "0.72 0.78 0.86"),
+    circle(70, 200, 12),
+    `${white} rg /F2 9 Tf 1 0 0 1 66 197 Tm (1) Tj`,
+    `${darkText} rg /F1 8.5 Tf 1 0 0 1 95 207 Tm (If several brothers and sisters sign up, you may be asked) Tj`,
+    `${darkText} rg /F1 8.5 Tf 1 0 0 1 95 194 Tm (to serve for only 30 minutes.) Tj`,
+    `${darkText} rg /F1 8.5 Tf 1 0 0 1 95 181 Tm (Please check your schedule accordingly.) Tj`,
+    line(95, 170, 535, 170, 0.6, "0.72 0.78 0.86"),
 
     // Note point 2.
-    circle(70, 173, 12),
-    `${white} rg /F2 9 Tf 1 0 0 1 66 170 Tm (2) Tj`,
-    `${darkText} rg /F1 8.5 Tf 1 0 0 1 95 180 Tm (After your assigned time, you may also continue with) Tj`,
-    `${darkText} rg /F1 8.5 Tf 1 0 0 1 95 167 Tm (informal witnessing or the house-to-house ministry) Tj`,
-    `${darkText} rg /F1 8.5 Tf 1 0 0 1 95 154 Tm (with your assigned partner.) Tj`,
-    line(95, 143, 535, 143, 0.6, "0.72 0.78 0.86"),
+    circle(70, 141, 12),
+    `${white} rg /F2 9 Tf 1 0 0 1 66 138 Tm (2) Tj`,
+    `${darkText} rg /F1 8.5 Tf 1 0 0 1 95 148 Tm (After your assigned time, you may also continue with) Tj`,
+    `${darkText} rg /F1 8.5 Tf 1 0 0 1 95 135 Tm (informal witnessing or the house-to-house ministry) Tj`,
+    `${darkText} rg /F1 8.5 Tf 1 0 0 1 95 122 Tm (with your assigned partner.) Tj`,
+    line(95, 111, 535, 111, 0.6, "0.72 0.78 0.86"),
 
     // Note point 3.
-    circle(70, 114, 12),
-    `${white} rg /F2 9 Tf 1 0 0 1 66 111 Tm (3) Tj`,
-    `${darkText} rg /F1 8.5 Tf 1 0 0 1 95 121 Tm (For this, please contact the assigned brother;) Tj`,
-    `${darkText} rg /F1 8.5 Tf 1 0 0 1 95 108 Tm (he will provide you with the territory.) Tj`,
+    circle(70, 82, 12),
+    `${white} rg /F2 9 Tf 1 0 0 1 66 79 Tm (3) Tj`,
+    `${darkText} rg /F1 8.5 Tf 1 0 0 1 95 89 Tm (For this, please contact the assigned brother;) Tj`,
+    `${darkText} rg /F1 8.5 Tf 1 0 0 1 95 76 Tm (he will provide you with the territory.) Tj`,
   ];
 
   if (noteLine) {
     const noteLines = wrapText(noteLine, 80);
     lines.push(
       `${navy} rg /F2 7.5 Tf`,
-      `1 0 0 1 95 88 Tm (${esc(noteLines[0])}) Tj`,
+      `1 0 0 1 95 63 Tm (${esc(noteLines[0])}) Tj`,
     );
   }
 
   lines.push(
     // Footer.
-    `${gold} RG 1 w 145 62 m 450 62 l S`,
-    `${navy} rg /F1 9 Tf 1 0 0 1 180 45 Tm (Thank you for your fine cooperation in the ministry.) Tj`,
+    `${gold} RG 1 w 145 42 m 450 42 l S`,
+    `${navy} rg /F1 9 Tf 1 0 0 1 180 28 Tm (Thank you for your fine cooperation in the ministry.) Tj`,
     `${navy} rg 0 0 595 18 re f`,
     `${gold} rg 0 18 595 3 re f`,
     "Q",
@@ -354,6 +363,7 @@ export default function CartWitnessingPage() {
   const [arrangementDate, setArrangementDate] = useState("");
   const [arrangementTime, setArrangementTime] = useState("9:00 AM - 10:00 AM");
   const [arrangement, setArrangement] = useState("Cart Witnessing - Residential");
+  const [arrangementLocation, setArrangementLocation] = useState("");
   const [assignedBrother, setAssignedBrother] = useState("");
   const [arrangementContact, setArrangementContact] = useState("");
   const [arrangementNote, setArrangementNote] = useState("");
@@ -382,6 +392,7 @@ export default function CartWitnessingPage() {
     const captains = schedule.dayCaptains[date] ?? [];
     const firstCaptain = captains[0];
     const firstEntry = schedule.entries.find((entry) => entry.date === date && entry.time.trim());
+    setArrangementLocation(firstEntry?.location || "");
     setArrangementDate(date);
     setArrangementTime(firstEntry?.time || (firstCaptain?.from || firstCaptain?.to ? `${firstCaptain.from || "9:00 AM"} - ${firstCaptain.to || "10:00 AM"}` : "9:00 AM - 10:00 AM"));
     setAssignedBrother(firstCaptain?.name || "");
@@ -395,6 +406,7 @@ export default function CartWitnessingPage() {
     const captains = schedule.dayCaptains[nextDate] ?? [];
     const firstCaptain = captains[0];
     const firstEntry = schedule.entries.find((entry) => entry.date === nextDate && entry.time.trim());
+    setArrangementLocation(firstEntry?.location || "");
     setArrangementDate(nextDate);
     setArrangementTime(firstEntry?.time || (firstCaptain?.from || firstCaptain?.to ? `${firstCaptain.from || "9:00 AM"} - ${firstCaptain.to || "10:00 AM"}` : "9:00 AM - 10:00 AM"));
     setAssignedBrother(firstCaptain?.name || "");
@@ -522,6 +534,7 @@ export default function CartWitnessingPage() {
         date: formatDate(arrangementDate),
         time: arrangementTime,
         arrangement,
+        location: arrangementLocation,
         assignedBrother,
         contact: arrangementContact,
         note: arrangementNote,
@@ -547,6 +560,7 @@ export default function CartWitnessingPage() {
         date: formatDate(arrangementDate),
         time: arrangementTime,
         arrangement,
+        location: arrangementLocation,
         assignedBrother,
         contact: arrangementContact,
         note: arrangementNote,
@@ -647,6 +661,7 @@ export default function CartWitnessingPage() {
           time={arrangementTime}
           timeOptions={arrangementTimeOptions}
           arrangement={arrangement}
+          location={arrangementLocation}
           assignedBrother={assignedBrother}
           contact={arrangementContact}
           note={arrangementNote}
@@ -655,6 +670,7 @@ export default function CartWitnessingPage() {
           onDateChange={(value) => syncArrangementDefaults(value)}
           onTimeChange={setArrangementTime}
           onArrangementChange={setArrangement}
+          onLocationChange={setArrangementLocation}
           onBrotherChange={(value) => {
             const captain = arrangementCaptains.find((item) => item.name === value);
             setAssignedBrother(value);
@@ -683,6 +699,7 @@ function ArrangementNotification({
   time,
   timeOptions,
   arrangement,
+  location,
   assignedBrother,
   contact,
   note,
@@ -691,6 +708,7 @@ function ArrangementNotification({
   onDateChange,
   onTimeChange,
   onArrangementChange,
+  onLocationChange,
   onBrotherChange,
   onContactChange,
   onNoteChange,
@@ -702,6 +720,7 @@ function ArrangementNotification({
   time: string;
   timeOptions: string[];
   arrangement: string;
+  location: string;
   assignedBrother: string;
   contact: string;
   note: string;
@@ -710,6 +729,7 @@ function ArrangementNotification({
   onDateChange: (value: string) => void;
   onTimeChange: (value: string) => void;
   onArrangementChange: (value: string) => void;
+  onLocationChange: (value: string) => void;
   onBrotherChange: (value: string) => void;
   onContactChange: (value: string) => void;
   onNoteChange: (value: string) => void;
@@ -755,6 +775,16 @@ function ArrangementNotification({
             <TextField select fullWidth label="Arrangement *" value={arrangement} onChange={(e) => onArrangementChange(e.target.value)}>
               {arrangementOptions.map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
             </TextField>
+          </Grid>
+          <Grid size={{ xs: 12 }}>
+            <TextField
+              fullWidth
+              label="Cart Witnessing Location *"
+              value={location}
+              onChange={(e) => onLocationChange(e.target.value)}
+              placeholder="Where will the cart witnessing take place?"
+              helperText="Taken from the selected Saturday/Sunday schedule location; you can edit it here."
+            />
           </Grid>
           <Grid size={{ xs: 12, md: 6 }}>
             <TextField
@@ -931,6 +961,5 @@ function EntryCard({ entry, captains, onChange, onAssignCaptain, onDelete }: { e
     </Card>
   );
 }
-
 
 
