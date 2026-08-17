@@ -250,21 +250,13 @@ async function createArrangementNotificationPdf(data: {
     textAt(105, 373, 10, "ASSIGNED BROTHER", "F2"),
     textAt(105, 311, 10, "CONTACT NUMBER", "F2"),
 
-    // Gold separators.
-    `${gold} RG 1.1 w 194 610 m 194 640 l S`,
-    `${gold} RG 1.1 w 194 548 m 194 578 l S`,
-    `${gold} RG 1.1 w 194 486 m 194 516 l S`,
-    `${gold} RG 1.1 w 194 424 m 194 454 l S`,
-    `${gold} RG 1.1 w 194 362 m 194 392 l S`,
-    `${gold} RG 1.1 w 194 300 m 194 330 l S`,
-
     // Values.
-    textAt(220, 621, 10, data.date || "-", "F1"),
-    textAt(220, 559, 10, data.time || "-", "F1"),
-    ...arrangementLines.map((value, index) => textAt(220, index === 0 ? 497 : 484, 9, value, "F1")),
-    ...locationLines.map((value, index) => textAt(220, index === 0 ? 435 : 422, 9, value, "F1")),
-    ...brotherLines.map((value, index) => textAt(220, index === 0 ? 373 : 360, 10, value, "F1")),
-    textAt(220, 311, 10, data.contact || "-", "F1"),
+    textAt(205, 621, 10, data.date || "-", "F1"),
+    textAt(205, 559, 10, data.time || "-", "F1"),
+    ...arrangementLines.map((value, index) => textAt(205, index === 0 ? 497 : 484, 9, value, "F1")),
+    ...locationLines.map((value, index) => textAt(205, index === 0 ? 435 : 422, 9, value, "F1")),
+    ...brotherLines.map((value, index) => textAt(205, index === 0 ? 373 : 360, 10, value, "F1")),
+    textAt(205, 311, 10, data.contact || "-", "F1"),
 
     // Please Note panel.
     `${lightBlue} rg 42 62 511 200 re f`,
@@ -840,7 +832,7 @@ function ArrangementNotification({
                     ["CONTACT NUMBER", contact || "—"],
                   ].map(([label, value]) => (
                     <Box key={label} sx={{ minHeight: 58, display: "grid", gridTemplateColumns: { xs: "125px 1fr", md: "160px 1fr" }, alignItems: "center", borderBottom: "1px solid #b9c2cf" }}>
-                      <Typography sx={{ fontWeight: 800, fontSize: { xs: 8, md: 10 }, color: "#0b1f4a", pr: 1, borderRight: "2px solid #d9a52e", minHeight: 30, display: "flex", alignItems: "center" }}>{label}</Typography>
+                      <Typography sx={{ fontWeight: 800, fontSize: { xs: 8, md: 10 }, color: "#0b1f4a", pr: 1, minHeight: 30, display: "flex", alignItems: "center" }}>{label}</Typography>
                       <Typography sx={{ pl: 2, fontSize: { xs: 9, md: 11 }, color: "#111827", wordBreak: "break-word" }}>{value}</Typography>
                     </Box>
                   ))}
