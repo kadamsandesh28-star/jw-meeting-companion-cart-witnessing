@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import PictureAsPdfRoundedIcon from "@mui/icons-material/PictureAsPdfRounded";
@@ -8,6 +8,7 @@ import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import TodayRoundedIcon from "@mui/icons-material/TodayRounded";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
+import NotificationsNoneRoundedIcon from "@mui/icons-material/NotificationsNoneRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import PersonAddAltRoundedIcon from "@mui/icons-material/PersonAddAltRounded";
 import {
@@ -15,7 +16,7 @@ import {
   Stack, TextField, ToggleButton, ToggleButtonGroup, Typography,
 } from "@mui/material";
 import {
-  CartWitnessingCaptain, CartWitnessingEntry, CartWitnessingMode, CartWitnessingSchedule,
+  CartWitnessingCaptain, CartWitnessingEntry, CartWitnessingSchedule,
 } from "./models/CartWitnessingSchedule";
 import {
   createEmptyCartWitnessingSchedule, createEntry,
@@ -26,16 +27,23 @@ import { exportCartWitnessingWord } from "./export/exportCartWitnessingWord";
 import { loadCongregationProfile } from "../../settings/storage/congregationProfileStorage";
 
 function shiftIsoDate(value: string, days: number) {
+  const d = new Date(`${value}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function mondayOf(value: string) {
   const d = new Date(`${value}T00:00:00`);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  const day = d.getDay();
+  d.setDate(d.getDate() - ((day + 6) % 7));
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
 function saturdayOf(value: string) {
   const d = new Date(`${value}T00:00:00`);
   const day = d.getDay();
   d.setDate(d.getDate() + (6 - day));
-  return d.toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
 /** Keep saved schedule rows aligned with the selected week. If an older saved
@@ -58,19 +66,19 @@ function normalizeScheduleWeek(schedule: CartWitnessingSchedule) {
   return { ...schedule, entries, dayCaptains, updatedAt: Date.now() };
 }
 
-const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 function formatDate(value: string) {
   if (!value) return "";
   return new Date(`${value}T00:00:00`).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
 }
 
-function getWeekDates(saturday: string) {
-  const date = new Date(`${saturday}T00:00:00`);
+function getWeekDates(monday: string) {
+  const date = new Date(`${monday}T00:00:00`);
   return days.map((_, index) => {
     const d = new Date(date);
-    d.setDate(date.getDate() - (6 - index));
-    return d.toISOString().slice(0, 10);
+    d.setDate(date.getDate() + index);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   });
 }
 
@@ -99,17 +107,227 @@ function formatClock(totalMinutes: number) {
   return `${hour12}:${String(minute).padStart(2, "0")} ${suffix}`;
 }
 
+
+function pdfEscape(value: string) {
+  return value.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+}
+
+function toLatin1Bytes(value: string) {
+  const bytes = new Uint8Array(value.length);
+  for (let i = 0; i < value.length; i += 1) bytes[i] = value.charCodeAt(i) & 0xff;
+  return bytes;
+}
+
+function concatBytes(parts: Uint8Array[]) {
+  const total = parts.reduce((sum, part) => sum + part.length, 0);
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const part of parts) {
+    out.set(part, offset);
+    offset += part.length;
+  }
+  return out;
+}
+
+async function imageUrlToJpegBytes(url: string) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("Arrangement cart image could not be loaded.");
+  const blob = await response.blob();
+  const bitmap = await createImageBitmap(blob);
+  const canvas = document.createElement("canvas");
+  const maxWidth = 700;
+  const scale = Math.min(1, maxWidth / bitmap.width);
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Canvas is not available.");
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  const dataUrl = canvas.toDataURL("image/jpeg", 0.86);
+  const base64 = dataUrl.split(",")[1];
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return { bytes, width: canvas.width, height: canvas.height };
+}
+
+async function createArrangementNotificationPdf(data: {
+  date: string;
+  time: string;
+  arrangement: string;
+  assignedBrother: string;
+  contact: string;
+  note: string;
+}) {
+  // Locked poster artwork. The sample values in the artwork are covered by
+  // white rectangles and replaced with the live values selected in the form.
+  const image = await imageUrlToJpegBytes("/arrangement-notification-poster.png");
+  const pageWidth = 595;
+  const pageHeight = 842;
+
+  const wrapText = (value: string, maxChars: number) => {
+    const clean = value?.trim() || "—";
+    if (clean.length <= maxChars) return [clean];
+    const words = clean.split(/\s+/);
+    const result: string[] = [];
+    let line = "";
+    for (const word of words) {
+      const next = line ? `${line} ${word}` : word;
+      if (next.length > maxChars && line) {
+        result.push(line);
+        line = word;
+      } else {
+        line = next;
+      }
+    }
+    if (line) result.push(line);
+    return result.slice(0, 2);
+  };
+
+  const congregationName = loadCongregationProfile().congregationName || "Congregation";
+  const arrangementLines = wrapText(data.arrangement, 30);
+  const brotherLines = wrapText(data.assignedBrother, 27);
+
+  const lines = [
+    "q",
+    `${pageWidth} 0 0 ${pageHeight} 0 0 cm`,
+    "/Im1 Do",
+    "Q",
+    // Cover only the sample values, leaving the approved labels, icons,
+    // dividers and all instructional artwork untouched.
+    "1 1 1 rg",
+    "402 596 181 31 re f",
+    "402 505 181 31 re f",
+    "402 414 181 38 re f",
+    "402 324 181 38 re f",
+    "402 233 181 34 re f",
+    // Congregation name in the clean space below the Cart Witnessing banner.
+    "0.03 0.12 0.35 rg",
+    "/F1 9 Tf",
+    `1 0 0 1 205 650 Tm (${pdfEscape(congregationName)}) Tj`,
+    // Dynamic values.
+    "/F1 10 Tf",
+    `1 0 0 1 410 616 Tm (${pdfEscape(data.date || "—")}) Tj`,
+    `1 0 0 1 410 525 Tm (${pdfEscape(data.time || "—")}) Tj`,
+    "/F1 9 Tf",
+    ...arrangementLines.map((line, index) => `1 0 0 1 410 ${index === 0 ? 439 : 427} Tm (${pdfEscape(line)}) Tj`),
+    "/F1 10 Tf",
+    ...brotherLines.map((line, index) => `1 0 0 1 410 ${index === 0 ? 349 : 337} Tm (${pdfEscape(line)}) Tj`),
+    `1 0 0 1 410 247 Tm (${pdfEscape(data.contact || "—")}) Tj`,
+    ...(data.note?.trim()
+      ? [
+          "/F1 7 Tf",
+          "0.12 0.23 0.36 rg",
+          `1 0 0 1 92 92 Tm (Additional note: ${pdfEscape(data.note.trim().slice(0, 110))}) Tj`,
+        ]
+      : []),
+  ].join("\n");
+
+  const imageObject = concatBytes([
+    toLatin1Bytes(
+      `<< /Type /XObject /Subtype /Image /Width ${image.width} /Height ${image.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${image.bytes.length} >>\nstream\n`
+    ),
+    image.bytes,
+    toLatin1Bytes("\nendstream"),
+  ]);
+
+  const contentBytes = toLatin1Bytes(lines);
+  const objects: Uint8Array[] = [
+    toLatin1Bytes("<< /Type /Catalog /Pages 2 0 R >>"),
+    toLatin1Bytes("<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+    toLatin1Bytes("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> /XObject << /Im1 5 0 R >> >> /Contents 6 0 R >>"),
+    toLatin1Bytes("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"),
+    imageObject,
+    toLatin1Bytes(`<< /Length ${contentBytes.length} >>\nstream\n${lines}\nendstream`),
+  ];
+
+  const header = toLatin1Bytes("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n");
+  const bodyParts: Uint8Array[] = [header];
+  const offsets: number[] = [0];
+  let position = header.length;
+
+  objects.forEach((object, index) => {
+    offsets[index + 1] = position;
+    const prefix = toLatin1Bytes(`${index + 1} 0 obj\n`);
+    const suffix = toLatin1Bytes("\nendobj\n");
+    bodyParts.push(prefix, object, suffix);
+    position += prefix.length + object.length + suffix.length;
+  });
+
+  const xrefPosition = position;
+  let xref = `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  for (let i = 1; i <= objects.length; i += 1) {
+    xref += `${String(offsets[i]).padStart(10, "0")} 00000 n \n`;
+  }
+  xref += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefPosition}\n%%EOF`;
+  bodyParts.push(toLatin1Bytes(xref));
+
+  return new Blob([concatBytes(bodyParts)], { type: "application/pdf" });
+}
+
+function arrangementPdfName(congregationName: string, date: string) {
+  return `${congregationName.replace(/[^a-z0-9]+/gi, "-")}-Arrangement-Notification-${date}.pdf`;
+}
+
 export default function CartWitnessingPage() {
   const congregationName = loadCongregationProfile().congregationName || "Congregation";
-  const [mode, setMode] = useState<CartWitnessingMode>("weekly");
+  const [mode, setMode] = useState<"weekly" | "weekend">("weekly");
   const [schedule, setSchedule] = useState<CartWitnessingSchedule>(() => {
     const saved = loadCartWitnessingSchedules();
     const latest = saved.sort((a, b) => b.updatedAt - a.updatedAt)[0] ?? createEmptyCartWitnessingSchedule();
-    return normalizeScheduleWeek(latest);
+    return normalizeScheduleWeek({ ...latest, weekOf: mondayOf(latest.weekOf) });
   });
-  const [dailyDate, setDailyDate] = useState(schedule.weekOf);
+  const [weekendDay, setWeekendDay] = useState<"saturday" | "sunday">("saturday");
+  const [arrangementDate, setArrangementDate] = useState("");
+  const [arrangementTime, setArrangementTime] = useState("9:00 AM – 10:00 AM");
+  const [arrangement, setArrangement] = useState("Cart Witnessing – Residential");
+  const [assignedBrother, setAssignedBrother] = useState("");
+  const [arrangementContact, setArrangementContact] = useState("");
+  const [arrangementNote, setArrangementNote] = useState("");
+  const [arrangementBusy, setArrangementBusy] = useState(false);
+
 
   const weekDates = useMemo(() => getWeekDates(schedule.weekOf), [schedule.weekOf]);
+  const arrangementDateOptions = weekDates.filter((date) => {
+    const day = new Date(`${date}T00:00:00`).getDay();
+    return day === 6 || day === 0;
+  });
+  const arrangementCaptains = schedule.dayCaptains[arrangementDate] ?? [];
+  const arrangementTimeOptions = useMemo(() => {
+    const values = new Set<string>();
+    for (const entry of schedule.entries.filter((item) => item.date === arrangementDate)) {
+      if (entry.time.trim()) values.add(entry.time.trim());
+    }
+    for (const captain of arrangementCaptains) {
+      if (captain.from || captain.to) values.add(`${captain.from || "9:00 AM"} – ${captain.to || "10:00 AM"}`);
+    }
+    if (!values.size) values.add("9:00 AM – 10:00 AM");
+    return [...values];
+  }, [arrangementDate, arrangementCaptains, schedule.entries]);
+
+  function syncArrangementDefaults(date: string) {
+    const captains = schedule.dayCaptains[date] ?? [];
+    const firstCaptain = captains[0];
+    const firstEntry = schedule.entries.find((entry) => entry.date === date && entry.time.trim());
+    setArrangementDate(date);
+    setArrangementTime(firstEntry?.time || (firstCaptain?.from || firstCaptain?.to ? `${firstCaptain.from || "9:00 AM"} – ${firstCaptain.to || "10:00 AM"}` : "9:00 AM – 10:00 AM"));
+    setAssignedBrother(firstCaptain?.name || "");
+    setArrangementContact(firstCaptain?.contact || "");
+  }
+
+  useEffect(() => {
+    if (!arrangementDateOptions.length) return;
+    const nextDate = arrangementDate && arrangementDateOptions.includes(arrangementDate) ? arrangementDate : arrangementDateOptions[0];
+    if (nextDate === arrangementDate) return;
+    const captains = schedule.dayCaptains[nextDate] ?? [];
+    const firstCaptain = captains[0];
+    const firstEntry = schedule.entries.find((entry) => entry.date === nextDate && entry.time.trim());
+    setArrangementDate(nextDate);
+    setArrangementTime(firstEntry?.time || (firstCaptain?.from || firstCaptain?.to ? `${firstCaptain.from || "9:00 AM"} – ${firstCaptain.to || "10:00 AM"}` : "9:00 AM – 10:00 AM"));
+    setAssignedBrother(firstCaptain?.name || "");
+    setArrangementContact(firstCaptain?.contact || "");
+  }, [arrangementDateOptions, arrangementDate, schedule.dayCaptains, schedule.entries]);
+
 
   function updateEntry(id: string, field: keyof CartWitnessingEntry, value: string) {
     setSchedule((current) => ({
@@ -199,22 +417,21 @@ export default function CartWitnessingPage() {
 
   function updateWeek(value: string) {
     setSchedule((current) => ({ ...current, weekOf: value, updatedAt: Date.now() }));
-    setDailyDate(value);
   }
 
   function nextWeekTemplate() {
     const next = new Date(`${schedule.weekOf}T00:00:00`);
     next.setDate(next.getDate() + 7);
-    const nextSaturday = next.toISOString().slice(0, 10);
-    setSchedule(createEmptyCartWitnessingSchedule(nextSaturday));
-    setDailyDate(nextSaturday);
+    const nextMonday = next.toISOString().slice(0, 10);
+    setSchedule(createEmptyCartWitnessingSchedule(nextMonday));
+    setWeekendDay("saturday");
   }
 
   async function sharePdf() {
     const blob = await createCartWitnessingPdfBlob(schedule);
     const file = new File([blob], `${congregationName.replace(/[^a-z0-9]+/gi, "-")}-Cart-Witnessing-${schedule.weekOf}.pdf`, { type: "application/pdf" });
     if (navigator.share && navigator.canShare?.({ files: [file] })) {
-      await navigator.share({ title: "Cart Witnessing Weekly Schedule", files: [file] });
+      await navigator.share({ title: "Cart Witnessing Schedule", files: [file] });
       return;
     }
     const url = URL.createObjectURL(blob);
@@ -225,12 +442,78 @@ export default function CartWitnessingPage() {
     URL.revokeObjectURL(url);
   }
 
+  async function exportArrangementPdf() {
+    try {
+      setArrangementBusy(true);
+      const blob = await createArrangementNotificationPdf({
+        date: formatDate(arrangementDate),
+        time: arrangementTime,
+        arrangement,
+        assignedBrother,
+        contact: arrangementContact,
+        note: arrangementNote,
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = arrangementPdfName(congregationName, arrangementDate);
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error(error);
+      alert("Arrangement Notification PDF could not be created.");
+    } finally {
+      setArrangementBusy(false);
+    }
+  }
+
+  async function shareArrangementPdf() {
+    try {
+      setArrangementBusy(true);
+      const blob = await createArrangementNotificationPdf({
+        date: formatDate(arrangementDate),
+        time: arrangementTime,
+        arrangement,
+        assignedBrother,
+        contact: arrangementContact,
+        note: arrangementNote,
+      });
+      const file = new File([blob], arrangementPdfName(congregationName, arrangementDate), { type: "application/pdf" });
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({
+          title: "Arrangement Notification",
+          text: "Please inform the assigned brother of your name regarding this arrangement and time slot.",
+          files: [file],
+        });
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = file.name;
+      link.click();
+      URL.revokeObjectURL(url);
+      alert("PDF downloaded. You can share the downloaded PDF with the assigned brother.");
+    } catch (error) {
+      if ((error as Error)?.name !== "AbortError") {
+        console.error(error);
+        alert("Arrangement Notification could not be shared.");
+      }
+    } finally {
+      setArrangementBusy(false);
+    }
+  }
+
   function save() {
     saveCartWitnessingSchedule(schedule);
     alert("Cart Witnessing schedule saved successfully.");
   }
 
   const entriesForDate = (date: string) => schedule.entries.filter((entry) => entry.date === date);
+  const weekendDates = getWeekDates(schedule.weekOf);
+  const saturdayDate = weekendDates[5];
+  const sundayDate = weekendDates[6];
+  const weekendDate = weekendDay === "saturday" ? saturdayDate : sundayDate;
 
   return (
     <Box sx={{ p: { xs: 2, md: 4 } }}>
@@ -244,7 +527,7 @@ export default function CartWitnessingPage() {
                   <Typography variant="h4" fontWeight={800}>{congregationName}</Typography>
                   <Button size="small" variant="outlined" startIcon={<EditRoundedIcon />} href="/settings">Edit</Button>
                 </Stack>
-                <Typography variant="h6" fontWeight={700}>Cart Witnessing — Weekly Schedule</Typography>
+                <Typography variant="h6" fontWeight={700}>Cart Witnessing Schedule</Typography>
                 <Typography color="text.secondary">Reusable daily or weekly schedule — assign up to two day captains by time range.</Typography>
               </Box>
               <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
@@ -254,17 +537,23 @@ export default function CartWitnessingPage() {
             </Stack>
 
             <ToggleButtonGroup exclusive value={mode} onChange={(_, value) => value && setMode(value)} size="small">
-              <ToggleButton value="daily"><TodayRoundedIcon sx={{ mr: 1 }} />Daily</ToggleButton>
+              <ToggleButton value="weekend"><TodayRoundedIcon sx={{ mr: 1 }} />Weekend</ToggleButton>
               <ToggleButton value="weekly"><CalendarMonthRoundedIcon sx={{ mr: 1 }} />Weekly</ToggleButton>
             </ToggleButtonGroup>
 
             <Grid container spacing={2} alignItems="center">
               <Grid size={{ xs: 12, sm: 5 }}>
-                <TextField fullWidth type="text" label="Week Of" value={schedule.weekOf} onChange={(e) => updateWeek(e.target.value)} placeholder="YYYY-MM-DD" helperText="Type the date manually" slotProps={{ inputLabel: { shrink: true } }} />
+                <TextField key={schedule.weekOf} fullWidth type="text" label="Week Of (Monday)" defaultValue={schedule.weekOf} onBlur={(e) => updateWeek(e.target.value)} placeholder="YYYY-MM-DD" helperText="Type the Monday date manually" slotProps={{ inputLabel: { shrink: true } }} />
               </Grid>
-              {mode === "daily" && (
-                <Grid size={{ xs: 12, sm: 5 }}>
-                  <TextField fullWidth type="text" label="Daily Schedule Date" value={dailyDate} onChange={(e) => setDailyDate(e.target.value)} placeholder="YYYY-MM-DD" helperText="Type the date manually" slotProps={{ inputLabel: { shrink: true } }} />
+              {mode === "weekend" && (
+                <Grid size={{ xs: 12, sm: 7 }}>
+                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
+                    <Typography variant="body2" color="text.secondary">Weekend day:</Typography>
+                    <ToggleButtonGroup exclusive value={weekendDay} onChange={(_, value) => value && setWeekendDay(value)} size="small">
+                      <ToggleButton value="saturday">Saturday — {formatDate(saturdayDate)}</ToggleButton>
+                      <ToggleButton value="sunday">Sunday — {formatDate(sundayDate)}</ToggleButton>
+                    </ToggleButtonGroup>
+                  </Stack>
                 </Grid>
               )}
             </Grid>
@@ -279,8 +568,33 @@ export default function CartWitnessingPage() {
           </Stack>
         </Paper>
 
-        {mode === "daily" ? (
-          <DailyView date={dailyDate} entries={entriesForDate(dailyDate)} captains={schedule.dayCaptains[dailyDate] ?? []} onAdd={() => addEntry(dailyDate)} onAddPair={(minutes) => addTimedPair(dailyDate, minutes)} onChange={updateEntry} onAssignCaptain={assignCaptain} onAddCaptain={() => addCaptain(dailyDate)} onUpdateCaptain={updateCaptain} onRemoveCaptain={removeCaptain} onDelete={deleteEntry} />
+        <ArrangementNotification
+          date={arrangementDate}
+          dateOptions={arrangementDateOptions}
+          time={arrangementTime}
+          timeOptions={arrangementTimeOptions}
+          arrangement={arrangement}
+          assignedBrother={assignedBrother}
+          contact={arrangementContact}
+          note={arrangementNote}
+          captains={arrangementCaptains}
+          busy={arrangementBusy}
+          onDateChange={(value) => syncArrangementDefaults(value)}
+          onTimeChange={setArrangementTime}
+          onArrangementChange={setArrangement}
+          onBrotherChange={(value) => {
+            const captain = arrangementCaptains.find((item) => item.name === value);
+            setAssignedBrother(value);
+            if (captain) setArrangementContact(captain.contact);
+          }}
+          onContactChange={setArrangementContact}
+          onNoteChange={setArrangementNote}
+          onExport={exportArrangementPdf}
+          onShare={shareArrangementPdf}
+        />
+
+        {mode === "weekend" ? (
+          <DailyView date={weekendDate} entries={entriesForDate(weekendDate)} captains={schedule.dayCaptains[weekendDate] ?? []} onAdd={() => addEntry(weekendDate)} onAddPair={(minutes) => addTimedPair(weekendDate, minutes)} onChange={updateEntry} onAssignCaptain={assignCaptain} onAddCaptain={() => addCaptain(weekendDate)} onUpdateCaptain={updateCaptain} onRemoveCaptain={removeCaptain} onDelete={deleteEntry} />
         ) : (
           <WeeklyView dates={weekDates} entries={schedule.entries} dayCaptains={schedule.dayCaptains} onAdd={addEntry} onAddPair={addTimedPair} onChange={updateEntry} onAssignCaptain={assignCaptain} onAddCaptain={addCaptain} onUpdateCaptain={updateCaptain} onRemoveCaptain={removeCaptain} onDelete={deleteEntry} />
         )}
@@ -288,6 +602,141 @@ export default function CartWitnessingPage() {
     </Box>
   );
 }
+
+
+function ArrangementNotification({
+  date,
+  dateOptions,
+  time,
+  timeOptions,
+  arrangement,
+  assignedBrother,
+  contact,
+  note,
+  captains,
+  busy,
+  onDateChange,
+  onTimeChange,
+  onArrangementChange,
+  onBrotherChange,
+  onContactChange,
+  onNoteChange,
+  onExport,
+  onShare,
+}: {
+  date: string;
+  dateOptions: string[];
+  time: string;
+  timeOptions: string[];
+  arrangement: string;
+  assignedBrother: string;
+  contact: string;
+  note: string;
+  captains: CartWitnessingCaptain[];
+  busy: boolean;
+  onDateChange: (value: string) => void;
+  onTimeChange: (value: string) => void;
+  onArrangementChange: (value: string) => void;
+  onBrotherChange: (value: string) => void;
+  onContactChange: (value: string) => void;
+  onNoteChange: (value: string) => void;
+  onExport: () => void;
+  onShare: () => void;
+}) {
+  const dateLabel = date ? formatDate(date) : "Select a date";
+  const arrangementOptions = [
+    "Cart Witnessing – Residential",
+    "Cart Witnessing – Public",
+    "Cart Witnessing – Special Arrangement",
+  ];
+
+  return (
+    <Paper elevation={0} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, border: 1, borderColor: "divider" }}>
+      <Stack spacing={2}>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <NotificationsNoneRoundedIcon color="warning" />
+          <Box>
+            <Typography variant="h6" fontWeight={800} color="primary.main">Arrangement Notification</Typography>
+            <Typography variant="body2" color="text.secondary">
+              Create a notification for the assigned brother of your name regarding a specific arrangement and time slot.
+            </Typography>
+          </Box>
+        </Stack>
+
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TextField
+              select fullWidth label="Arrangement Date *" value={date}
+              onChange={(e) => onDateChange(e.target.value)}
+              helperText={dateLabel}
+            >
+              {dateOptions.map((item) => <MenuItem key={item} value={item}>{formatDate(item)}</MenuItem>)}
+            </TextField>
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TextField select fullWidth label="Time Slot *" value={time} onChange={(e) => onTimeChange(e.target.value)}>
+              {timeOptions.map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
+            </TextField>
+          </Grid>
+          <Grid size={{ xs: 12 }}>
+            <TextField select fullWidth label="Arrangement *" value={arrangement} onChange={(e) => onArrangementChange(e.target.value)}>
+              {arrangementOptions.map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
+            </TextField>
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TextField
+              select fullWidth label="Assigned Brother *" value={assignedBrother}
+              onChange={(e) => onBrotherChange(e.target.value)}
+              helperText={captains.length ? "Taken from the selected day's assigned brothers." : "Add a day captain above to select a name here."}
+            >
+              {captains.map((captain, index) => (
+                <MenuItem key={captain.id} value={captain.name}>{captain.name || `Captain ${index + 1}`}</MenuItem>
+              ))}
+              {!captains.length && <MenuItem value="">No assigned brother yet</MenuItem>}
+            </TextField>
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TextField fullWidth label="Contact Number *" value={contact} onChange={(e) => onContactChange(e.target.value)} />
+          </Grid>
+          <Grid size={{ xs: 12 }}>
+            <TextField fullWidth multiline minRows={2} label="Note (Optional)" value={note} onChange={(e) => onNoteChange(e.target.value)} placeholder="Type any additional note (optional)" />
+          </Grid>
+        </Grid>
+
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+          <Button fullWidth variant="contained" startIcon={<PictureAsPdfRoundedIcon />} onClick={onExport} disabled={busy || !date}>
+            {busy ? "Creating PDF..." : "Export PDF"}
+          </Button>
+          <Button fullWidth variant="outlined" startIcon={<ShareRoundedIcon />} onClick={onShare} disabled={busy || !date}>
+            Share PDF
+          </Button>
+        </Stack>
+
+        <Paper variant="outlined" sx={{ p: { xs: 1.5, md: 2 }, borderRadius: 2.5, overflow: "hidden" }}>
+          <Typography variant="subtitle2" fontWeight={800} color="primary.main" sx={{ mb: 1.5 }}>Preview (Final PDF Design)</Typography>
+          <Card variant="outlined" sx={{ borderRadius: 2.5, overflow: "hidden", maxWidth: 700, mx: "auto", bgcolor: "#fff" }}>
+            <Box
+              component="img"
+              src="/arrangement-notification-poster.png"
+              alt="Arrangement Notification final PDF design"
+              sx={{ width: "100%", height: "auto", display: "block" }}
+            />
+          </Card>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1, textAlign: "center" }}>
+            The PDF uses this locked design and overlays the selected date, time, arrangement, assigned brother and contact number.
+          </Typography>
+        </Paper>
+
+        <Paper sx={{ p: 1.5, bgcolor: "primary.50", borderRadius: 2 }} elevation={0}>
+          <Typography variant="body2">
+            <strong>Tip:</strong> Share this notification with your assigned brother through the PDF.
+          </Typography>
+        </Paper>
+      </Stack>
+    </Paper>
+  );
+}
+
 
 type ViewProps = {
   date: string;
@@ -307,33 +756,33 @@ function WeeklyView({ dates, entries, dayCaptains, onAdd, onAddPair, onChange, o
   return (
     <Stack spacing={2}>
       {dates.map((date) => {
-        const saturday = new Date(`${date}T00:00:00`).getDay() === 6;
+        const monday = new Date(`${date}T00:00:00`).getDay() === 1;
         const dayEntries = entries
           .filter((entry) => entry.date === date)
           .sort((a, b) => (parseClock(a.time) ?? Number.MAX_SAFE_INTEGER) - (parseClock(b.time) ?? Number.MAX_SAFE_INTEGER));
-        return <DaySection key={date} date={date} saturday={saturday} entries={dayEntries} captains={dayCaptains[date] ?? []} onAdd={() => onAdd(date)} onAddPair={(minutes) => onAddPair(date, minutes)} onChange={onChange} onAssignCaptain={onAssignCaptain} onAddCaptain={() => onAddCaptain(date)} onUpdateCaptain={onUpdateCaptain} onRemoveCaptain={onRemoveCaptain} onDelete={onDelete} />;
+        return <DaySection key={date} date={date} monday={monday} entries={dayEntries} captains={dayCaptains[date] ?? []} onAdd={() => onAdd(date)} onAddPair={(minutes) => onAddPair(date, minutes)} onChange={onChange} onAssignCaptain={onAssignCaptain} onAddCaptain={() => onAddCaptain(date)} onUpdateCaptain={onUpdateCaptain} onRemoveCaptain={onRemoveCaptain} onDelete={onDelete} />;
       })}
     </Stack>
   );
 }
 
 function DailyView({ date, entries, captains, onAdd, onAddPair, onChange, onAssignCaptain, onAddCaptain, onUpdateCaptain, onRemoveCaptain, onDelete }: ViewProps) {
-  return <DaySection date={date} saturday={new Date(`${date}T00:00:00`).getDay() === 6} entries={entries} captains={captains} onAdd={onAdd} onAddPair={onAddPair} onChange={onChange} onAssignCaptain={onAssignCaptain} onAddCaptain={onAddCaptain} onUpdateCaptain={onUpdateCaptain} onRemoveCaptain={onRemoveCaptain} onDelete={onDelete} />;
+  return <DaySection date={date} monday={new Date(`${date}T00:00:00`).getDay() === 1} entries={entries} captains={captains} onAdd={onAdd} onAddPair={onAddPair} onChange={onChange} onAssignCaptain={onAssignCaptain} onAddCaptain={onAddCaptain} onUpdateCaptain={onUpdateCaptain} onRemoveCaptain={onRemoveCaptain} onDelete={onDelete} />;
 }
 
-function DaySection({ date, saturday, entries, captains, onAdd, onAddPair, onChange, onAssignCaptain, onAddCaptain, onUpdateCaptain, onRemoveCaptain, onDelete }: ViewProps & { saturday: boolean }) {
+function DaySection({ date, monday, entries, captains, onAdd, onAddPair, onChange, onAssignCaptain, onAddCaptain, onUpdateCaptain, onRemoveCaptain, onDelete }: ViewProps & { monday: boolean }) {
   return (
-    <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: 1, borderColor: saturday ? "warning.main" : "divider", bgcolor: saturday ? "warning.50" : "background.paper" }}>
+    <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: 1, borderColor: monday ? "warning.main" : "divider", bgcolor: monday ? "warning.50" : "background.paper" }}>
       <Stack spacing={2}>
         <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" alignItems={{ xs: "stretch", md: "center" }} spacing={1.5}>
           <Box>
             <Typography variant="h6" fontWeight={800}>{formatDate(date)}</Typography>
-            {saturday && <Chip size="small" label="Saturday — Priority" color="warning" sx={{ mt: 0.5 }} />}
+            {monday && <Chip size="small" label="Monday — Week Start" color="warning" sx={{ mt: 0.5 }} />}
           </Box>
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap justifyContent="flex-end">
             <Button size="small" variant="outlined" startIcon={<PersonAddAltRoundedIcon />} onClick={onAddCaptain} disabled={captains.length >= 2}>{captains.length >= 2 ? "2 Captains Added" : `Add Captain (${captains.length}/2)`}</Button>
             <Button size="small" variant="outlined" startIcon={<AddRoundedIcon />} onClick={onAdd}>Add Blank</Button>
-            <Button size="small" variant="contained" color={saturday ? "warning" : "primary"} startIcon={<AccessTimeRoundedIcon />} onClick={() => onAddPair(30)}>+ 30-min Pair</Button>
+            <Button size="small" variant="contained" color={monday ? "warning" : "primary"} startIcon={<AccessTimeRoundedIcon />} onClick={() => onAddPair(30)}>+ 30-min Pair</Button>
             <Button size="small" variant="outlined" startIcon={<AccessTimeRoundedIcon />} onClick={() => onAddPair(60)}>+ 1-hour Pair</Button>
           </Stack>
         </Stack>
