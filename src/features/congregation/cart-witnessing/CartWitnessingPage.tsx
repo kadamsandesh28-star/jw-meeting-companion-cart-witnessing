@@ -129,26 +129,8 @@ function concatBytes(parts: Uint8Array[]) {
   return out;
 }
 
-async function imageUrlToJpegBytes(url: string) {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error("Arrangement cart image could not be loaded.");
-  const blob = await response.blob();
-  const bitmap = await createImageBitmap(blob);
-  const canvas = document.createElement("canvas");
-  const maxWidth = 700;
-  const scale = Math.min(1, maxWidth / bitmap.width);
-  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("Canvas is not available.");
-  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-  const dataUrl = canvas.toDataURL("image/jpeg", 0.86);
-  const base64 = dataUrl.split(",")[1];
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-  return { bytes, width: canvas.width, height: canvas.height };
+function pdfText(value: string) {
+  return pdfEscape((value || "-").replace(/[^\x20-\x7E]/g, " "));
 }
 
 async function createArrangementNotificationPdf(data: {
@@ -159,17 +141,14 @@ async function createArrangementNotificationPdf(data: {
   contact: string;
   note: string;
 }) {
-  // Rebuild the arrangement poster as a real PDF instead of writing text on
-  // top of the finished artwork. The cart photo is cropped from the approved
-  // poster image, while every label/value is drawn cleanly by the PDF itself.
-  const source = await imageUrlToJpegBytes("/arrangement-notification-poster.png");
+  // Fully vector PDF: no poster image, no Bible/logo artwork, and no
+  // hard-coded sample values. Every visible value is generated from the form.
   const pageWidth = 595;
   const pageHeight = 842;
-
-  const congregationName = loadCongregationProfile().congregationName || "Congregation";
+  const congregationName = loadCongregationProfile().congregationName || "Vadodara East Congregation";
 
   const wrapText = (value: string, maxChars: number) => {
-    const clean = value?.trim() || "—";
+    const clean = value?.trim() || "-";
     if (clean.length <= maxChars) return [clean];
     const words = clean.split(/\s+/);
     const result: string[] = [];
@@ -189,194 +168,150 @@ async function createArrangementNotificationPdf(data: {
 
   const arrangementLines = wrapText(data.arrangement, 30);
   const brotherLines = wrapText(data.assignedBrother, 27);
-  const contact = data.contact?.trim() || "—";
-  const date = data.date?.trim() || "—";
-  const time = data.time?.trim() || "—";
+  const noteLine = data.note?.trim() ? `Additional note: ${data.note.trim()}` : "";
 
-  // The original artwork is 525x722. These coordinates isolate only the cart
-  // photograph so no sample text from the artwork is ever carried into the PDF.
-  const cartCrop = await cropImageFromJpegBytes(source.bytes, source.width, source.height, {
-    x: 75, y: 162, width: 141, height: 284,
-  });
+  const navy = "0.03 0.12 0.35";
+  const gold = "0.82 0.58 0.14";
+  const lightBlue = "0.94 0.97 1";
+  const darkText = "0.08 0.12 0.18";
+  const muted = "0.55 0.60 0.67";
+  const white = "1 1 1";
 
-  const esc = pdfEscape;
+  const esc = (value: string) => pdfText(value);
+
+  const textAt = (x: number, y: number, size: number, value: string, font = "F1") =>
+    `${navy} rg /${font} ${size} Tf 1 0 0 1 ${x} ${y} Tm (${esc(value)}) Tj`;
+
+  const line = (x1: number, y1: number, x2: number, y2: number, width = 0.7, color = muted) =>
+    `${color} RG ${width} w ${x1} ${y1} m ${x2} ${y2} l S`;
+
+  const circle = (cx: number, cy: number, radius: number, color = navy) =>
+    `${color} rg ${cx} ${cy} ${radius} 0 360 arc f`;
+
+  const roundedRect = (x: number, y: number, w: number, h: number, color: string) =>
+    `${color} rg ${x} ${y} ${w} ${h} re f`;
+
   const lines: string[] = [
     "q",
-    // Page background.
-    "0.96 0.97 0.98 rg",
-    `0 0 ${pageWidth} ${pageHeight} re f`,
+    // Background.
+    `${white} rg 0 0 ${pageWidth} ${pageHeight} re f`,
 
-    // Navy outer frame and gold inner line.
-    "0.02 0.10 0.22 rg",
-    `0 0 ${pageWidth} 18 re f`,
-    `0 ${pageHeight - 18} ${pageWidth} 18 re f`,
-    "0.80 0.62 0.25 rg",
-    `0 18 ${pageWidth} 3 re f`,
-    `0 ${pageHeight - 21} ${pageWidth} 3 re f`,
+    // Top navy header and gold accents.
+    `${navy} rg 0 760 ${pageWidth} 82 re f`,
+    `${gold} rg 0 760 ${pageWidth} 3 re f`,
+    `${gold} rg 0 839 ${pageWidth} 3 re f`,
+    `${white} rg /F2 18 Tf 1 0 0 1 50 792 Tm (${esc(congregationName)}) Tj`,
 
-    // White poster body.
-    "1 1 1 rg",
-    "18 18 559 806 re f",
+    // Main title.
+    textAt(50, 724, 25, "ARRANGEMENT NOTIFICATION", "F2"),
+    `${gold} RG 1.2 w 155 707 m 440 707 l S`,
+    `${navy} rg 172 674 251 34 re f`,
+    `${gold} rg 164 674 8 34 re f`,
+    `${gold} rg 423 674 8 34 re f`,
+    `${white} rg /F2 14 Tf 1 0 0 1 226 686 Tm (CART WITNESSING) Tj`,
 
-    // Header navy/gold treatment.
-    "0.02 0.10 0.22 rg",
-    "18 742 559 82 re f",
-    "0.80 0.62 0.25 rg",
-    "18 739 559 3 re f",
-    "18 824 559 3 re f",
+    // Detail rows.
+    roundedRect(42, 586, 511, 58, white),
+    roundedRect(42, 520, 511, 58, white),
+    roundedRect(42, 454, 511, 58, white),
+    roundedRect(42, 388, 511, 58, white),
+    roundedRect(42, 322, 511, 58, white),
 
-    // Book icon circle.
-    "1 1 1 rg",
-    "297 781 34 34 re f",
-    "0.02 0.10 0.22 rg",
-    "297 781 34 34 re S",
-    "/F1 16 Tf",
-    "1 0 0 1 308 792 Tm (B) Tj",
+    // Row dividers.
+    line(42, 586, 553, 586),
+    line(42, 520, 553, 520),
+    line(42, 454, 553, 454),
+    line(42, 388, 553, 388),
+    line(42, 322, 553, 322),
 
-    // Title.
-    "/F1 24 Tf",
-    "0.02 0.10 0.22 rg",
-    `1 0 0 1 103 707 Tm (${esc("ARRANGEMENT NOTIFICATION")}) Tj`,
-
-    // Gold lines around title.
-    "0.80 0.62 0.25 rg",
-    "78 697 105 2 re f",
-    "412 697 105 2 re f",
-
-    // Cart Witnessing banner.
-    "0.02 0.10 0.22 rg",
-    "145 668 305 30 re f",
-    "0.80 0.62 0.25 rg",
-    "137 668 8 30 re f",
-    "450 668 8 30 re f",
-    "1 1 1 rg",
-    "/F1 14 Tf",
-    `1 0 0 1 202 678 Tm (${esc("CART WITNESSING")}) Tj`,
-
-    // Congregation name.
-    "0.02 0.10 0.22 rg",
-    "/F1 7 Tf",
-    `1 0 0 1 205 657 Tm (${esc(congregationName)}) Tj`,
-
-    // Cart photo frame.
-    "0.90 0.91 0.92 rg",
-    "72 290 190 345 re f",
-    "0.02 0.10 0.22 rg",
-    "72 290 190 345 re S",
-
-    // Cart image object is drawn here.
-    "q",
-    "190 0 0 345 72 290 cm",
-    "/Im2 Do",
-    "Q",
-
-    // Information rows.
-    "0.02 0.10 0.22 rg",
-    "/F1 8 Tf",
-    "0.88 0.89 0.90 rg",
-    "285 575 275 1 re f",
-    "285 484 275 1 re f",
-    "285 393 275 1 re f",
-    "285 302 275 1 re f",
-
-    // Icon circles.
-    "0.02 0.10 0.22 rg",
-    "298 590 31 31 re f",
-    "298 499 31 31 re f",
-    "298 408 31 31 re f",
-    "298 317 31 31 re f",
-    "298 226 31 31 re f",
-    "1 1 1 rg",
-    "/F1 8 Tf",
-    "1 0 0 1 309 601 Tm (D) Tj",
-    "1 0 0 1 309 510 Tm (T) Tj",
-    "1 0 0 1 309 419 Tm (A) Tj",
-    "1 0 0 1 309 328 Tm (B) Tj",
-    "1 0 0 1 309 237 Tm (C) Tj",
+    // Simple letter icons: deliberately plain, with no Bible/logo.
+    circle(70, 615, 17),
+    circle(70, 549, 17),
+    circle(70, 483, 17),
+    circle(70, 417, 17),
+    circle(70, 351, 17),
+    `${white} rg /F2 10 Tf 1 0 0 1 66 611 Tm (D) Tj`,
+    `${white} rg /F2 10 Tf 1 0 0 1 66 545 Tm (T) Tj`,
+    `${white} rg /F2 10 Tf 1 0 0 1 66 479 Tm (A) Tj`,
+    `${white} rg /F2 10 Tf 1 0 0 1 66 413 Tm (B) Tj`,
+    `${white} rg /F2 10 Tf 1 0 0 1 66 347 Tm (C) Tj`,
 
     // Labels.
-    "0.02 0.10 0.22 rg",
-    "/F1 8 Tf",
-    `1 0 0 1 343 603 Tm (${esc("DATE")}) Tj`,
-    `1 0 0 1 343 512 Tm (${esc("TIME SLOT")}) Tj`,
-    `1 0 0 1 343 421 Tm (${esc("ARRANGEMENT")}) Tj`,
-    `1 0 0 1 343 330 Tm (${esc("ASSIGNED BROTHER")}) Tj`,
-    `1 0 0 1 343 239 Tm (${esc("CONTACT NUMBER")}) Tj`,
+    textAt(105, 611, 10, "DATE", "F2"),
+    textAt(105, 545, 10, "TIME SLOT", "F2"),
+    textAt(105, 479, 10, "ARRANGEMENT", "F2"),
+    textAt(105, 413, 10, "ASSIGNED BROTHER", "F2"),
+    textAt(105, 347, 10, "CONTACT NUMBER", "F2"),
 
-    // Values in a dedicated right column.
-    "/F1 9 Tf",
-    `1 0 0 1 421 603 Tm (${esc(date)}) Tj`,
-    `1 0 0 1 421 512 Tm (${esc(time)}) Tj`,
-    "/F1 8 Tf",
-    ...arrangementLines.map((line, index) => `1 0 0 1 421 ${index === 0 ? 421 : 410} Tm (${esc(line)}) Tj`),
-    "/F1 9 Tf",
-    ...brotherLines.map((line, index) => `1 0 0 1 421 ${index === 0 ? 330 : 319} Tm (${esc(line)}) Tj`),
-    `1 0 0 1 421 239 Tm (${esc(contact)}) Tj`,
+    // Gold separators.
+    `${gold} RG 1.1 w 194 600 m 194 630 l S`,
+    `${gold} RG 1.1 w 194 534 m 194 564 l S`,
+    `${gold} RG 1.1 w 194 468 m 194 498 l S`,
+    `${gold} RG 1.1 w 194 402 m 194 432 l S`,
+    `${gold} RG 1.1 w 194 336 m 194 366 l S`,
 
-    // Please note panel.
-    "0.94 0.96 0.99 rg",
-    "35 74 525 135 re f",
-    "0.02 0.10 0.22 rg",
-    "35 191 165 18 re f",
-    "0.80 0.62 0.25 rg",
-    "200 191 8 18 re f",
-    "1 1 1 rg",
-    "/F1 9 Tf",
-    `1 0 0 1 55 197 Tm (${esc("PLEASE NOTE")}) Tj`,
+    // Values.
+    textAt(220, 611, 10, data.date || "-", "F1"),
+    textAt(220, 545, 10, data.time || "-", "F1"),
+    ...arrangementLines.map((value, index) => textAt(220, index === 0 ? 479 : 466, 9, value, "F1")),
+    ...brotherLines.map((value, index) => textAt(220, index === 0 ? 413 : 400, 10, value, "F1")),
+    textAt(220, 347, 10, data.contact || "-", "F1"),
 
-    // Note icons.
-    "0.02 0.10 0.22 rg",
-    "55 153 30 30 re f",
-    "55 112 30 30 re f",
-    "55 81 30 30 re f",
-    "1 1 1 rg",
-    "/F1 8 Tf",
-    "1 0 0 1 65 164 Tm (T) Tj",
-    "1 0 0 1 65 123 Tm (H) Tj",
-    "1 0 0 1 65 92 Tm (P) Tj",
+    // Please Note panel.
+    `${lightBlue} rg 42 94 511 200 re f`,
+    `${navy} rg 42 266 511 28 re f`,
+    `${gold} rg 190 266 9 28 re f`,
+    `${white} rg /F2 13 Tf 1 0 0 1 61 275 Tm (PLEASE NOTE) Tj`,
 
-    // Instruction text.
-    "0.10 0.16 0.24 rg",
-    "/F1 8 Tf",
-    `1 0 0 1 100 166 Tm (${esc("If several brothers and sisters sign up, you may be assigned")}) Tj`,
-    `1 0 0 1 100 154 Tm (${esc("to serve for only 30 minutes. Please check your schedule accordingly.")}) Tj`,
-    `1 0 0 1 100 128 Tm (${esc("After your assigned time, you may also continue with")}) Tj`,
-    `1 0 0 1 100 116 Tm (${esc("informal witnessing or the house-to-house ministry with your assigned partner.")}) Tj`,
-    `1 0 0 1 100 92 Tm (${esc("For this, please contact the assigned brother;")}) Tj`,
-    `1 0 0 1 100 80 Tm (${esc("he will provide you with the territory.")}) Tj`,
+    // Note point 1.
+    circle(70, 232, 12),
+    `${white} rg /F2 9 Tf 1 0 0 1 66 229 Tm (1) Tj`,
+    `${darkText} rg /F1 8.5 Tf 1 0 0 1 95 239 Tm (If several brothers and sisters sign up, you may be asked) Tj`,
+    `${darkText} rg /F1 8.5 Tf 1 0 0 1 95 226 Tm (to serve for only 30 minutes.) Tj`,
+    `${darkText} rg /F1 8.5 Tf 1 0 0 1 95 213 Tm (Please check your schedule accordingly.) Tj`,
+    line(95, 202, 535, 202, 0.6, "0.72 0.78 0.86"),
 
-    // Optional note from the form, below the panel if supplied.
-    ...(data.note?.trim() ? [
-      "0.02 0.10 0.22 rg",
-      "/F1 7 Tf",
-      `1 0 0 1 38 58 Tm (${esc(data.note.trim().slice(0, 120))}) Tj`,
-    ] : []),
+    // Note point 2.
+    circle(70, 173, 12),
+    `${white} rg /F2 9 Tf 1 0 0 1 66 170 Tm (2) Tj`,
+    `${darkText} rg /F1 8.5 Tf 1 0 0 1 95 180 Tm (After your assigned time, you may also continue with) Tj`,
+    `${darkText} rg /F1 8.5 Tf 1 0 0 1 95 167 Tm (informal witnessing or the house-to-house ministry) Tj`,
+    `${darkText} rg /F1 8.5 Tf 1 0 0 1 95 154 Tm (with your assigned partner.) Tj`,
+    line(95, 143, 535, 143, 0.6, "0.72 0.78 0.86"),
 
-    // Footer.
-    "0.80 0.62 0.25 rg",
-    "205 39 185 1 re f",
-    "0.02 0.10 0.22 rg",
-    "/F1 8 Tf",
-    `1 0 0 1 193 27 Tm (${esc("Thank you for your fine cooperation in the ministry.")}) Tj`,
-    "Q",
+    // Note point 3.
+    circle(70, 114, 12),
+    `${white} rg /F2 9 Tf 1 0 0 1 66 111 Tm (3) Tj`,
+    `${darkText} rg /F1 8.5 Tf 1 0 0 1 95 121 Tm (For this, please contact the assigned brother;) Tj`,
+    `${darkText} rg /F1 8.5 Tf 1 0 0 1 95 108 Tm (he will provide you with the territory.) Tj`,
   ];
 
-  const contentBytes = toLatin1Bytes(lines.join("\n"));
-  const cartImageObject = concatBytes([
-    toLatin1Bytes(
-      `<< /Type /XObject /Subtype /Image /Width ${cartCrop.width} /Height ${cartCrop.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${cartCrop.bytes.length} >>\nstream\n`
-    ),
-    cartCrop.bytes,
-    toLatin1Bytes("\nendstream"),
-  ]);
+  if (noteLine) {
+    const noteLines = wrapText(noteLine, 80);
+    lines.push(
+      `${navy} rg /F2 7.5 Tf`,
+      `1 0 0 1 95 88 Tm (${esc(noteLines[0])}) Tj`,
+    );
+  }
 
+  lines.push(
+    // Footer.
+    `${gold} RG 1 w 145 62 m 450 62 l S`,
+    `${navy} rg /F1 9 Tf 1 0 0 1 180 45 Tm (Thank you for your fine cooperation in the ministry.) Tj`,
+    `${navy} rg 0 0 595 18 re f`,
+    `${gold} rg 0 18 595 3 re f`,
+    "Q",
+  );
+
+  const content = lines.join("\n");
+  const contentBytes = toLatin1Bytes(content);
   const objects: Uint8Array[] = [
     toLatin1Bytes("<< /Type /Catalog /Pages 2 0 R >>"),
     toLatin1Bytes("<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
-    toLatin1Bytes("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> /XObject << /Im2 5 0 R >> >> /Contents 6 0 R >>"),
+    toLatin1Bytes("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>"),
     toLatin1Bytes("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"),
-    cartImageObject,
-    toLatin1Bytes(`<< /Length ${contentBytes.length} >>\nstream\n${lines.join("\n")}\nendstream`),
+    toLatin1Bytes("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>"),
+    toLatin1Bytes(`<< /Length ${contentBytes.length} >>\nstream\n${content}\nendstream`),
   ];
 
   const header = toLatin1Bytes("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n");
@@ -403,30 +338,6 @@ async function createArrangementNotificationPdf(data: {
   return new Blob([concatBytes(bodyParts)], { type: "application/pdf" });
 }
 
-async function cropImageFromJpegBytes(
-  bytes: Uint8Array,
-  _width: number,
-  _height: number,
-  crop: { x: number; y: number; width: number; height: number },
-) {
-  const binary = Array.from(bytes, (byte) => String.fromCharCode(byte)).join("");
-  const blob = new Blob([Uint8Array.from(binary, (char) => char.charCodeAt(0))], { type: "image/jpeg" });
-  const bitmap = await createImageBitmap(blob);
-  const canvas = document.createElement("canvas");
-  canvas.width = crop.width;
-  canvas.height = crop.height;
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("Canvas is not available.");
-  context.drawImage(bitmap, crop.x, crop.y, crop.width, crop.height, 0, 0, crop.width, crop.height);
-  bitmap.close();
-  const dataUrl = canvas.toDataURL("image/jpeg", 0.90);
-  const base64 = dataUrl.split(",")[1];
-  const binaryOut = atob(base64);
-  const out = new Uint8Array(binaryOut.length);
-  for (let i = 0; i < binaryOut.length; i += 1) out[i] = binaryOut.charCodeAt(i);
-  return { bytes: out, width: crop.width, height: crop.height };
-}
-
 function arrangementPdfName(congregationName: string, date: string) {
   return `${congregationName.replace(/[^a-z0-9]+/gi, "-")}-Arrangement-Notification-${date}.pdf`;
 }
@@ -441,8 +352,8 @@ export default function CartWitnessingPage() {
   });
   const [weekendDay, setWeekendDay] = useState<"saturday" | "sunday">("saturday");
   const [arrangementDate, setArrangementDate] = useState("");
-  const [arrangementTime, setArrangementTime] = useState("9:00 AM – 10:00 AM");
-  const [arrangement, setArrangement] = useState("Cart Witnessing – Residential");
+  const [arrangementTime, setArrangementTime] = useState("9:00 AM - 10:00 AM");
+  const [arrangement, setArrangement] = useState("Cart Witnessing - Residential");
   const [assignedBrother, setAssignedBrother] = useState("");
   const [arrangementContact, setArrangementContact] = useState("");
   const [arrangementNote, setArrangementNote] = useState("");
@@ -461,9 +372,9 @@ export default function CartWitnessingPage() {
       if (entry.time.trim()) values.add(entry.time.trim());
     }
     for (const captain of arrangementCaptains) {
-      if (captain.from || captain.to) values.add(`${captain.from || "9:00 AM"} – ${captain.to || "10:00 AM"}`);
+      if (captain.from || captain.to) values.add(`${captain.from || "9:00 AM"} - ${captain.to || "10:00 AM"}`);
     }
-    if (!values.size) values.add("9:00 AM – 10:00 AM");
+    if (!values.size) values.add("9:00 AM - 10:00 AM");
     return [...values];
   }, [arrangementDate, arrangementCaptains, schedule.entries]);
 
@@ -472,7 +383,7 @@ export default function CartWitnessingPage() {
     const firstCaptain = captains[0];
     const firstEntry = schedule.entries.find((entry) => entry.date === date && entry.time.trim());
     setArrangementDate(date);
-    setArrangementTime(firstEntry?.time || (firstCaptain?.from || firstCaptain?.to ? `${firstCaptain.from || "9:00 AM"} – ${firstCaptain.to || "10:00 AM"}` : "9:00 AM – 10:00 AM"));
+    setArrangementTime(firstEntry?.time || (firstCaptain?.from || firstCaptain?.to ? `${firstCaptain.from || "9:00 AM"} - ${firstCaptain.to || "10:00 AM"}` : "9:00 AM - 10:00 AM"));
     setAssignedBrother(firstCaptain?.name || "");
     setArrangementContact(firstCaptain?.contact || "");
   }
@@ -485,7 +396,7 @@ export default function CartWitnessingPage() {
     const firstCaptain = captains[0];
     const firstEntry = schedule.entries.find((entry) => entry.date === nextDate && entry.time.trim());
     setArrangementDate(nextDate);
-    setArrangementTime(firstEntry?.time || (firstCaptain?.from || firstCaptain?.to ? `${firstCaptain.from || "9:00 AM"} – ${firstCaptain.to || "10:00 AM"}` : "9:00 AM – 10:00 AM"));
+    setArrangementTime(firstEntry?.time || (firstCaptain?.from || firstCaptain?.to ? `${firstCaptain.from || "9:00 AM"} - ${firstCaptain.to || "10:00 AM"}` : "9:00 AM - 10:00 AM"));
     setAssignedBrother(firstCaptain?.name || "");
     setArrangementContact(firstCaptain?.contact || "");
   }, [arrangementDateOptions, arrangementDate, schedule.dayCaptains, schedule.entries]);
@@ -511,7 +422,7 @@ export default function CartWitnessingPage() {
         entries: current.entries.map((item) => item.id === entryId ? {
           ...item,
           captainId,
-          captainContact: captain ? `${captain.name}${captain.contact ? `  —  ${captain.contact}` : ""}` : item.captainContact,
+          captainContact: captain ? `${captain.name}${captain.contact ? `  -  ${captain.contact}` : ""}` : item.captainContact,
         } : item),
       };
     });
@@ -712,8 +623,8 @@ export default function CartWitnessingPage() {
                   <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
                     <Typography variant="body2" color="text.secondary">Weekend day:</Typography>
                     <ToggleButtonGroup exclusive value={weekendDay} onChange={(_, value) => value && setWeekendDay(value)} size="small">
-                      <ToggleButton value="saturday">Saturday — {formatDate(saturdayDate)}</ToggleButton>
-                      <ToggleButton value="sunday">Sunday — {formatDate(sundayDate)}</ToggleButton>
+                      <ToggleButton value="saturday">Saturday  -  {formatDate(saturdayDate)}</ToggleButton>
+                      <ToggleButton value="sunday">Sunday  -  {formatDate(sundayDate)}</ToggleButton>
                     </ToggleButtonGroup>
                   </Stack>
                 </Grid>
@@ -807,9 +718,9 @@ function ArrangementNotification({
 }) {
   const dateLabel = date ? formatDate(date) : "Select a date";
   const arrangementOptions = [
-    "Cart Witnessing – Residential",
-    "Cart Witnessing – Public",
-    "Cart Witnessing – Special Arrangement",
+    "Cart Witnessing - Residential",
+    "Cart Witnessing - Public",
+    "Cart Witnessing - Special Arrangement",
   ];
 
   return (
@@ -939,7 +850,7 @@ function DaySection({ date, monday, entries, captains, onAdd, onAddPair, onChang
         <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" alignItems={{ xs: "stretch", md: "center" }} spacing={1.5}>
           <Box>
             <Typography variant="h6" fontWeight={800}>{formatDate(date)}</Typography>
-            {monday && <Chip size="small" label="Monday — Week Start" color="warning" sx={{ mt: 0.5 }} />}
+            {monday && <Chip size="small" label="Monday  -  Week Start" color="warning" sx={{ mt: 0.5 }} />}
           </Box>
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap justifyContent="flex-end">
             <Button size="small" variant="outlined" startIcon={<PersonAddAltRoundedIcon />} onClick={onAddCaptain} disabled={captains.length >= 2}>{captains.length >= 2 ? "2 Captains Added" : `Add Captain (${captains.length}/2)`}</Button>
@@ -1002,13 +913,13 @@ function EntryCard({ entry, captains, onChange, onAssignCaptain, onDelete }: { e
             <Button color="error" size="small" startIcon={<DeleteOutlineRoundedIcon />} onClick={() => onDelete(entry.id)}>Remove</Button>
           </Stack>
           <Grid container spacing={2}>
-            <Grid size={{ xs: 12, sm: 4, md: 2 }}><TextField fullWidth label="Time" value={entry.time} onChange={field("time")} placeholder="9:00 – 9:30" /></Grid>
+            <Grid size={{ xs: 12, sm: 4, md: 2 }}><TextField fullWidth label="Time" value={entry.time} onChange={field("time")} placeholder="9:00 - 9:30" /></Grid>
             <Grid size={{ xs: 12, sm: 8, md: 4 }}><TextField fullWidth label="Location" value={entry.location} onChange={field("location")} /></Grid>
             <Grid size={{ xs: 12, sm: 4, md: 2 }}><TextField fullWidth label="Cart" value={entry.cart} onChange={field("cart")} placeholder="Cart 1" /></Grid>
             <Grid size={{ xs: 12, sm: 8, md: 4 }}>
               <Select fullWidth displayEmpty value={entry.captainId ?? ""} onChange={(e) => onAssignCaptain(entry.id, e.target.value)}>
                 <MenuItem value=""><em>No day captain</em></MenuItem>
-                {captains.map((captain, index) => <MenuItem key={captain.id} value={captain.id}>{captain.name || `Captain ${index + 1}`} {captain.from || captain.to ? `(${captain.from || "?"} – ${captain.to || "?"})` : ""}</MenuItem>)}
+                {captains.map((captain, index) => <MenuItem key={captain.id} value={captain.id}>{captain.name || `Captain ${index + 1}`} {captain.from || captain.to ? `(${captain.from || "?"} - ${captain.to || "?"})` : ""}</MenuItem>)}
               </Select>
             </Grid>
             <Grid size={{ xs: 12, md: 6 }}><TextField fullWidth label="Participants" value={entry.participants} onChange={field("participants")} placeholder="Names" /></Grid>
@@ -1020,8 +931,6 @@ function EntryCard({ entry, captains, onChange, onAssignCaptain, onDelete }: { e
     </Card>
   );
 }
-
-
 
 
 
