@@ -159,8 +159,7 @@ async function createArrangementNotificationPdf(data: {
   contact: string;
   note: string;
 }) {
-  // Locked poster artwork. The sample values in the artwork are covered by
-  // white rectangles and replaced with the live values selected in the form.
+  // Locked poster artwork.
   const image = await imageUrlToJpegBytes("/arrangement-notification-poster.png");
   const pageWidth = 595;
   const pageHeight = 842;
@@ -168,11 +167,14 @@ async function createArrangementNotificationPdf(data: {
   const wrapText = (value: string, maxChars: number) => {
     const clean = value?.trim() || "—";
     if (clean.length <= maxChars) return [clean];
+
     const words = clean.split(/\s+/);
     const result: string[] = [];
     let line = "";
+
     for (const word of words) {
       const next = line ? `${line} ${word}` : word;
+
       if (next.length > maxChars && line) {
         result.push(line);
         line = word;
@@ -180,11 +182,14 @@ async function createArrangementNotificationPdf(data: {
         line = next;
       }
     }
+
     if (line) result.push(line);
     return result.slice(0, 2);
   };
 
-  const congregationName = loadCongregationProfile().congregationName || "Congregation";
+  const congregationName =
+    loadCongregationProfile().congregationName || "Congregation";
+
   const arrangementLines = wrapText(data.arrangement, 30);
   const brotherLines = wrapText(data.assignedBrother, 27);
 
@@ -193,32 +198,63 @@ async function createArrangementNotificationPdf(data: {
     `${pageWidth} 0 0 ${pageHeight} 0 0 cm`,
     "/Im1 Do",
     "Q",
-    // Cover only the sample values, leaving the approved labels, icons,
-    // dividers and all instructional artwork untouched.
+
+    // Cover ALL sample/demonstration values from the locked poster.
+    // These are deliberately a little larger so no old sample values
+    // remain visible underneath the live values.
     "1 1 1 rg",
-    "402 596 181 31 re f",
-    "402 505 181 31 re f",
-    "402 414 181 38 re f",
-    "402 324 181 38 re f",
-    "402 233 181 34 re f",
-    // Congregation name in the clean space below the Cart Witnessing banner.
+
+    // Date
+    "398 588 190 48 re f",
+
+    // Time slot — also covers the smaller secondary time values
+    "398 493 190 55 re f",
+
+    // Arrangement
+    "398 402 190 55 re f",
+
+    // Assigned brother — covers old sample name/value
+    "398 311 190 55 re f",
+
+    // Contact number — covers old number and old name underneath
+    "398 218 190 55 re f",
+
+    // Congregation name
     "0.03 0.12 0.35 rg",
     "/F1 9 Tf",
     `1 0 0 1 205 650 Tm (${pdfEscape(congregationName)}) Tj`,
-    // Dynamic values.
+
+    // DATE
     "/F1 10 Tf",
     `1 0 0 1 410 616 Tm (${pdfEscape(data.date || "—")}) Tj`,
+
+    // TIME SLOT
     `1 0 0 1 410 525 Tm (${pdfEscape(data.time || "—")}) Tj`,
+
+    // ARRANGEMENT
     "/F1 9 Tf",
-    ...arrangementLines.map((line, index) => `1 0 0 1 410 ${index === 0 ? 439 : 427} Tm (${pdfEscape(line)}) Tj`),
+    ...arrangementLines.map(
+      (line, index) =>
+        `1 0 0 1 410 ${index === 0 ? 439 : 427} Tm (${pdfEscape(line)}) Tj`
+    ),
+
+    // ASSIGNED BROTHER
     "/F1 10 Tf",
-    ...brotherLines.map((line, index) => `1 0 0 1 410 ${index === 0 ? 349 : 337} Tm (${pdfEscape(line)}) Tj`),
+    ...brotherLines.map(
+      (line, index) =>
+        `1 0 0 1 410 ${index === 0 ? 349 : 337} Tm (${pdfEscape(line)}) Tj`
+    ),
+
+    // CONTACT NUMBER
     `1 0 0 1 410 247 Tm (${pdfEscape(data.contact || "—")}) Tj`,
+
     ...(data.note?.trim()
       ? [
           "/F1 7 Tf",
           "0.12 0.23 0.36 rg",
-          `1 0 0 1 92 92 Tm (Additional note: ${pdfEscape(data.note.trim().slice(0, 110))}) Tj`,
+          `1 0 0 1 92 92 Tm (Additional note: ${pdfEscape(
+            data.note.trim().slice(0, 110)
+          )}) Tj`,
         ]
       : []),
   ].join("\n");
@@ -232,13 +268,20 @@ async function createArrangementNotificationPdf(data: {
   ]);
 
   const contentBytes = toLatin1Bytes(lines);
+
   const objects: Uint8Array[] = [
     toLatin1Bytes("<< /Type /Catalog /Pages 2 0 R >>"),
     toLatin1Bytes("<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
-    toLatin1Bytes("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> /XObject << /Im1 5 0 R >> >> /Contents 6 0 R >>"),
-    toLatin1Bytes("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"),
+    toLatin1Bytes(
+      "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> /XObject << /Im1 5 0 R >> >> /Contents 6 0 R >>"
+    ),
+    toLatin1Bytes(
+      "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"
+    ),
     imageObject,
-    toLatin1Bytes(`<< /Length ${contentBytes.length} >>\nstream\n${lines}\nendstream`),
+    toLatin1Bytes(
+      `<< /Length ${contentBytes.length} >>\nstream\n${lines}\nendstream`
+    ),
   ];
 
   const header = toLatin1Bytes("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n");
@@ -248,21 +291,31 @@ async function createArrangementNotificationPdf(data: {
 
   objects.forEach((object, index) => {
     offsets[index + 1] = position;
+
     const prefix = toLatin1Bytes(`${index + 1} 0 obj\n`);
     const suffix = toLatin1Bytes("\nendobj\n");
+
     bodyParts.push(prefix, object, suffix);
     position += prefix.length + object.length + suffix.length;
   });
 
   const xrefPosition = position;
+
   let xref = `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+
   for (let i = 1; i <= objects.length; i += 1) {
     xref += `${String(offsets[i]).padStart(10, "0")} 00000 n \n`;
   }
-  xref += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefPosition}\n%%EOF`;
+
+  xref += `trailer\n<< /Size ${
+    objects.length + 1
+  } /Root 1 0 R >>\nstartxref\n${xrefPosition}\n%%EOF`;
+
   bodyParts.push(toLatin1Bytes(xref));
 
-  return new Blob([concatBytes(bodyParts)], { type: "application/pdf" });
+  return new Blob([concatBytes(bodyParts)], {
+    type: "application/pdf",
+  });
 }
 
 function arrangementPdfName(congregationName: string, date: string) {
