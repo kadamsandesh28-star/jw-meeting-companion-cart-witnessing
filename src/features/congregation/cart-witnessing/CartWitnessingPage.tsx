@@ -159,22 +159,23 @@ async function createArrangementNotificationPdf(data: {
   contact: string;
   note: string;
 }) {
-  // Locked poster artwork.
-  const image = await imageUrlToJpegBytes("/arrangement-notification-poster.png");
+  // Rebuild the arrangement poster as a real PDF instead of writing text on
+  // top of the finished artwork. The cart photo is cropped from the approved
+  // poster image, while every label/value is drawn cleanly by the PDF itself.
+  const source = await imageUrlToJpegBytes("/arrangement-notification-poster.png");
   const pageWidth = 595;
   const pageHeight = 842;
+
+  const congregationName = loadCongregationProfile().congregationName || "Congregation";
 
   const wrapText = (value: string, maxChars: number) => {
     const clean = value?.trim() || "—";
     if (clean.length <= maxChars) return [clean];
-
     const words = clean.split(/\s+/);
     const result: string[] = [];
     let line = "";
-
     for (const word of words) {
       const next = line ? `${line} ${word}` : word;
-
       if (next.length > maxChars && line) {
         result.push(line);
         line = word;
@@ -182,106 +183,200 @@ async function createArrangementNotificationPdf(data: {
         line = next;
       }
     }
-
     if (line) result.push(line);
     return result.slice(0, 2);
   };
 
-  const congregationName =
-    loadCongregationProfile().congregationName || "Congregation";
-
   const arrangementLines = wrapText(data.arrangement, 30);
   const brotherLines = wrapText(data.assignedBrother, 27);
+  const contact = data.contact?.trim() || "—";
+  const date = data.date?.trim() || "—";
+  const time = data.time?.trim() || "—";
 
-  const lines = [
+  // The original artwork is 525x722. These coordinates isolate only the cart
+  // photograph so no sample text from the artwork is ever carried into the PDF.
+  const cartCrop = await cropImageFromJpegBytes(source.bytes, source.width, source.height, {
+    x: 75, y: 162, width: 141, height: 284,
+  });
+
+  const esc = pdfEscape;
+  const lines: string[] = [
     "q",
-    `${pageWidth} 0 0 ${pageHeight} 0 0 cm`,
-    "/Im1 Do",
+    // Page background.
+    "0.96 0.97 0.98 rg",
+    `0 0 ${pageWidth} ${pageHeight} re f`,
+
+    // Navy outer frame and gold inner line.
+    "0.02 0.10 0.22 rg",
+    `0 0 ${pageWidth} 18 re f`,
+    `0 ${pageHeight - 18} ${pageWidth} 18 re f`,
+    "0.80 0.62 0.25 rg",
+    `0 18 ${pageWidth} 3 re f`,
+    `0 ${pageHeight - 21} ${pageWidth} 3 re f`,
+
+    // White poster body.
+    "1 1 1 rg",
+    "18 18 559 806 re f",
+
+    // Header navy/gold treatment.
+    "0.02 0.10 0.22 rg",
+    "18 742 559 82 re f",
+    "0.80 0.62 0.25 rg",
+    "18 739 559 3 re f",
+    "18 824 559 3 re f",
+
+    // Book icon circle.
+    "1 1 1 rg",
+    "297 781 34 34 re f",
+    "0.02 0.10 0.22 rg",
+    "297 781 34 34 re S",
+    "/F1 16 Tf",
+    "1 0 0 1 308 792 Tm (B) Tj",
+
+    // Title.
+    "/F1 24 Tf",
+    "0.02 0.10 0.22 rg",
+    `1 0 0 1 103 707 Tm (${esc("ARRANGEMENT NOTIFICATION")}) Tj`,
+
+    // Gold lines around title.
+    "0.80 0.62 0.25 rg",
+    "78 697 105 2 re f",
+    "412 697 105 2 re f",
+
+    // Cart Witnessing banner.
+    "0.02 0.10 0.22 rg",
+    "145 668 305 30 re f",
+    "0.80 0.62 0.25 rg",
+    "137 668 8 30 re f",
+    "450 668 8 30 re f",
+    "1 1 1 rg",
+    "/F1 14 Tf",
+    `1 0 0 1 202 678 Tm (${esc("CART WITNESSING")}) Tj`,
+
+    // Congregation name.
+    "0.02 0.10 0.22 rg",
+    "/F1 7 Tf",
+    `1 0 0 1 205 657 Tm (${esc(congregationName)}) Tj`,
+
+    // Cart photo frame.
+    "0.90 0.91 0.92 rg",
+    "72 290 190 345 re f",
+    "0.02 0.10 0.22 rg",
+    "72 290 190 345 re S",
+
+    // Cart image object is drawn here.
+    "q",
+    "190 0 0 345 72 290 cm",
+    "/Im2 Do",
     "Q",
 
-    // Cover ALL sample/demonstration values from the locked poster.
-    // These are deliberately a little larger so no old sample values
-    // remain visible underneath the live values.
+    // Information rows.
+    "0.02 0.10 0.22 rg",
+    "/F1 8 Tf",
+    "0.88 0.89 0.90 rg",
+    "285 575 275 1 re f",
+    "285 484 275 1 re f",
+    "285 393 275 1 re f",
+    "285 302 275 1 re f",
+
+    // Icon circles.
+    "0.02 0.10 0.22 rg",
+    "298 590 31 31 re f",
+    "298 499 31 31 re f",
+    "298 408 31 31 re f",
+    "298 317 31 31 re f",
+    "298 226 31 31 re f",
     "1 1 1 rg",
+    "/F1 8 Tf",
+    "1 0 0 1 309 601 Tm (D) Tj",
+    "1 0 0 1 309 510 Tm (T) Tj",
+    "1 0 0 1 309 419 Tm (A) Tj",
+    "1 0 0 1 309 328 Tm (B) Tj",
+    "1 0 0 1 309 237 Tm (C) Tj",
 
-    // Date
-    "398 588 190 48 re f",
+    // Labels.
+    "0.02 0.10 0.22 rg",
+    "/F1 8 Tf",
+    `1 0 0 1 343 603 Tm (${esc("DATE")}) Tj`,
+    `1 0 0 1 343 512 Tm (${esc("TIME SLOT")}) Tj`,
+    `1 0 0 1 343 421 Tm (${esc("ARRANGEMENT")}) Tj`,
+    `1 0 0 1 343 330 Tm (${esc("ASSIGNED BROTHER")}) Tj`,
+    `1 0 0 1 343 239 Tm (${esc("CONTACT NUMBER")}) Tj`,
 
-    // Time slot — also covers the smaller secondary time values
-    "398 493 190 55 re f",
-
-    // Arrangement
-    "398 402 190 55 re f",
-
-    // Assigned brother — covers old sample name/value
-    "398 311 190 55 re f",
-
-    // Contact number — covers old number and old name underneath
-    "398 218 190 55 re f",
-
-    // Congregation name
-    "0.03 0.12 0.35 rg",
+    // Values in a dedicated right column.
     "/F1 9 Tf",
-    `1 0 0 1 205 650 Tm (${pdfEscape(congregationName)}) Tj`,
-
-    // DATE
-    "/F1 10 Tf",
-    `1 0 0 1 410 616 Tm (${pdfEscape(data.date || "—")}) Tj`,
-
-    // TIME SLOT
-    `1 0 0 1 410 525 Tm (${pdfEscape(data.time || "—")}) Tj`,
-
-    // ARRANGEMENT
+    `1 0 0 1 421 603 Tm (${esc(date)}) Tj`,
+    `1 0 0 1 421 512 Tm (${esc(time)}) Tj`,
+    "/F1 8 Tf",
+    ...arrangementLines.map((line, index) => `1 0 0 1 421 ${index === 0 ? 421 : 410} Tm (${esc(line)}) Tj`),
     "/F1 9 Tf",
-    ...arrangementLines.map(
-      (line, index) =>
-        `1 0 0 1 410 ${index === 0 ? 439 : 427} Tm (${pdfEscape(line)}) Tj`
-    ),
+    ...brotherLines.map((line, index) => `1 0 0 1 421 ${index === 0 ? 330 : 319} Tm (${esc(line)}) Tj`),
+    `1 0 0 1 421 239 Tm (${esc(contact)}) Tj`,
 
-    // ASSIGNED BROTHER
-    "/F1 10 Tf",
-    ...brotherLines.map(
-      (line, index) =>
-        `1 0 0 1 410 ${index === 0 ? 349 : 337} Tm (${pdfEscape(line)}) Tj`
-    ),
+    // Please note panel.
+    "0.94 0.96 0.99 rg",
+    "35 74 525 135 re f",
+    "0.02 0.10 0.22 rg",
+    "35 191 165 18 re f",
+    "0.80 0.62 0.25 rg",
+    "200 191 8 18 re f",
+    "1 1 1 rg",
+    "/F1 9 Tf",
+    `1 0 0 1 55 197 Tm (${esc("PLEASE NOTE")}) Tj`,
 
-    // CONTACT NUMBER
-    `1 0 0 1 410 247 Tm (${pdfEscape(data.contact || "—")}) Tj`,
+    // Note icons.
+    "0.02 0.10 0.22 rg",
+    "55 153 30 30 re f",
+    "55 112 30 30 re f",
+    "55 81 30 30 re f",
+    "1 1 1 rg",
+    "/F1 8 Tf",
+    "1 0 0 1 65 164 Tm (T) Tj",
+    "1 0 0 1 65 123 Tm (H) Tj",
+    "1 0 0 1 65 92 Tm (P) Tj",
 
-    ...(data.note?.trim()
-      ? [
-          "/F1 7 Tf",
-          "0.12 0.23 0.36 rg",
-          `1 0 0 1 92 92 Tm (Additional note: ${pdfEscape(
-            data.note.trim().slice(0, 110)
-          )}) Tj`,
-        ]
-      : []),
-  ].join("\n");
+    // Instruction text.
+    "0.10 0.16 0.24 rg",
+    "/F1 8 Tf",
+    `1 0 0 1 100 166 Tm (${esc("If several brothers and sisters sign up, you may be assigned")}) Tj`,
+    `1 0 0 1 100 154 Tm (${esc("to serve for only 30 minutes. Please check your schedule accordingly.")}) Tj`,
+    `1 0 0 1 100 128 Tm (${esc("After your assigned time, you may also continue with")}) Tj`,
+    `1 0 0 1 100 116 Tm (${esc("informal witnessing or the house-to-house ministry with your assigned partner.")}) Tj`,
+    `1 0 0 1 100 92 Tm (${esc("For this, please contact the assigned brother;")}) Tj`,
+    `1 0 0 1 100 80 Tm (${esc("he will provide you with the territory.")}) Tj`,
 
-  const imageObject = concatBytes([
+    // Optional note from the form, below the panel if supplied.
+    ...(data.note?.trim() ? [
+      "0.02 0.10 0.22 rg",
+      "/F1 7 Tf",
+      `1 0 0 1 38 58 Tm (${esc(data.note.trim().slice(0, 120))}) Tj`,
+    ] : []),
+
+    // Footer.
+    "0.80 0.62 0.25 rg",
+    "205 39 185 1 re f",
+    "0.02 0.10 0.22 rg",
+    "/F1 8 Tf",
+    `1 0 0 1 193 27 Tm (${esc("Thank you for your fine cooperation in the ministry.")}) Tj`,
+    "Q",
+  ];
+
+  const contentBytes = toLatin1Bytes(lines.join("\n"));
+  const cartImageObject = concatBytes([
     toLatin1Bytes(
-      `<< /Type /XObject /Subtype /Image /Width ${image.width} /Height ${image.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${image.bytes.length} >>\nstream\n`
+      `<< /Type /XObject /Subtype /Image /Width ${cartCrop.width} /Height ${cartCrop.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${cartCrop.bytes.length} >>\nstream\n`
     ),
-    image.bytes,
+    cartCrop.bytes,
     toLatin1Bytes("\nendstream"),
   ]);
-
-  const contentBytes = toLatin1Bytes(lines);
 
   const objects: Uint8Array[] = [
     toLatin1Bytes("<< /Type /Catalog /Pages 2 0 R >>"),
     toLatin1Bytes("<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
-    toLatin1Bytes(
-      "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> /XObject << /Im1 5 0 R >> >> /Contents 6 0 R >>"
-    ),
-    toLatin1Bytes(
-      "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"
-    ),
-    imageObject,
-    toLatin1Bytes(
-      `<< /Length ${contentBytes.length} >>\nstream\n${lines}\nendstream`
-    ),
+    toLatin1Bytes("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> /XObject << /Im2 5 0 R >> >> /Contents 6 0 R >>"),
+    toLatin1Bytes("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"),
+    cartImageObject,
+    toLatin1Bytes(`<< /Length ${contentBytes.length} >>\nstream\n${lines.join("\n")}\nendstream`),
   ];
 
   const header = toLatin1Bytes("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n");
@@ -291,31 +386,45 @@ async function createArrangementNotificationPdf(data: {
 
   objects.forEach((object, index) => {
     offsets[index + 1] = position;
-
     const prefix = toLatin1Bytes(`${index + 1} 0 obj\n`);
     const suffix = toLatin1Bytes("\nendobj\n");
-
     bodyParts.push(prefix, object, suffix);
     position += prefix.length + object.length + suffix.length;
   });
 
   const xrefPosition = position;
-
   let xref = `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
-
   for (let i = 1; i <= objects.length; i += 1) {
     xref += `${String(offsets[i]).padStart(10, "0")} 00000 n \n`;
   }
-
-  xref += `trailer\n<< /Size ${
-    objects.length + 1
-  } /Root 1 0 R >>\nstartxref\n${xrefPosition}\n%%EOF`;
-
+  xref += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefPosition}\n%%EOF`;
   bodyParts.push(toLatin1Bytes(xref));
 
-  return new Blob([concatBytes(bodyParts)], {
-    type: "application/pdf",
-  });
+  return new Blob([concatBytes(bodyParts)], { type: "application/pdf" });
+}
+
+async function cropImageFromJpegBytes(
+  bytes: Uint8Array,
+  _width: number,
+  _height: number,
+  crop: { x: number; y: number; width: number; height: number },
+) {
+  const binary = Array.from(bytes, (byte) => String.fromCharCode(byte)).join("");
+  const blob = new Blob([Uint8Array.from(binary, (char) => char.charCodeAt(0))], { type: "image/jpeg" });
+  const bitmap = await createImageBitmap(blob);
+  const canvas = document.createElement("canvas");
+  canvas.width = crop.width;
+  canvas.height = crop.height;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Canvas is not available.");
+  context.drawImage(bitmap, crop.x, crop.y, crop.width, crop.height, 0, 0, crop.width, crop.height);
+  bitmap.close();
+  const dataUrl = canvas.toDataURL("image/jpeg", 0.90);
+  const base64 = dataUrl.split(",")[1];
+  const binaryOut = atob(base64);
+  const out = new Uint8Array(binaryOut.length);
+  for (let i = 0; i < binaryOut.length; i += 1) out[i] = binaryOut.charCodeAt(i);
+  return { bytes: out, width: crop.width, height: crop.height };
 }
 
 function arrangementPdfName(congregationName: string, date: string) {
