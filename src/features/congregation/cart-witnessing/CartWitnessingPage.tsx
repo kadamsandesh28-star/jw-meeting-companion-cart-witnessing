@@ -806,7 +806,7 @@ function CaptainPanel({ date, captains, onUpdate, onRemove }: { date: string; ca
       <Typography variant="subtitle2" fontWeight={800}>Day Captains</Typography>
       <Grid container spacing={1.5}>
         {captains.map((captain, index) => (
-          <Grid key={captain.id} size={{ xs: 12, md: 6 }}>
+          <Grid key={captain.id} size={{ xs: 12, md: captains.length === 1 ? 12 : 6 }}>
             <Card variant="outlined" sx={{ borderRadius: 2.5 }}>
               <CardContent sx={{ p: 1.75, "&:last-child": { pb: 1.75 } }}>
                 <Stack spacing={1.25}>
@@ -858,6 +858,7 @@ function EntryCard({ entry, captains, onChange, onAssignCaptain, onDelete }: { e
     </Card>
   );
 }
+
 
 
 
