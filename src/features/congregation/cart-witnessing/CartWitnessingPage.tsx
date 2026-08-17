@@ -142,8 +142,8 @@ async function createArrangementNotificationPdf(data: {
   contact: string;
   note: string;
 }) {
-  // Fully vector PDF: no poster image, no Bible/logo artwork, and no
-  // hard-coded sample values. Every visible value is generated from the form.
+  // Clean, fully vector arrangement notification. No poster image, no logo,
+  // and no hard-coded sample values are used.
   const pageWidth = 595;
   const pageHeight = 842;
   const congregationName = loadCongregationProfile().congregationName || "Vadodara East Congregation";
@@ -153,154 +153,145 @@ async function createArrangementNotificationPdf(data: {
     if (clean.length <= maxChars) return [clean];
     const words = clean.split(/\s+/);
     const result: string[] = [];
-    let line = "";
+    let current = "";
     for (const word of words) {
-      const next = line ? `${line} ${word}` : word;
-      if (next.length > maxChars && line) {
-        result.push(line);
-        line = word;
+      const next = current ? `${current} ${word}` : word;
+      if (next.length > maxChars && current) {
+        result.push(current);
+        current = word;
       } else {
-        line = next;
+        current = next;
       }
     }
-    if (line) result.push(line);
+    if (current) result.push(current);
     return result.slice(0, 2);
   };
 
-  const arrangementLines = wrapText(data.arrangement, 30);
-  const locationLines = wrapText(data.location, 30);
-  const brotherLines = wrapText(data.assignedBrother, 27);
-  const noteLine = data.note?.trim() ? `Additional note: ${data.note.trim()}` : "";
-
   const navy = "0.03 0.12 0.35";
   const gold = "0.82 0.58 0.14";
-  const lightBlue = "0.94 0.97 1";
-  const darkText = "0.08 0.12 0.18";
-  const muted = "0.55 0.60 0.67";
+  const border = "0.67 0.72 0.80";
+  const darkText = "0.06 0.08 0.12";
   const white = "1 1 1";
 
   const esc = (value: string) => pdfText(value);
-
-  const textAt = (x: number, y: number, size: number, value: string, font = "F1") =>
-    `${navy} rg /${font} ${size} Tf 1 0 0 1 ${x} ${y} Tm (${esc(value)}) Tj`;
-
-  const line = (x1: number, y1: number, x2: number, y2: number, width = 0.7, color = muted) =>
+  const textAt = (x: number, y: number, size: number, value: string, font = "F1", color = navy) =>
+    `${color} rg /${font} ${size} Tf 1 0 0 1 ${x} ${y} Tm (${esc(value)}) Tj`;
+  const strokeLine = (x1: number, y1: number, x2: number, y2: number, width = 0.8, color = border) =>
     `${color} RG ${width} w ${x1} ${y1} m ${x2} ${y2} l S`;
-
-  const circle = (cx: number, cy: number, radius: number, color = navy) =>
-    `${color} rg ${cx} ${cy} ${radius} 0 360 arc f`;
-
-  const roundedRect = (x: number, y: number, w: number, h: number, color: string) =>
+  const fillRect = (x: number, y: number, w: number, h: number, color: string) =>
     `${color} rg ${x} ${y} ${w} ${h} re f`;
+  const strokeRoundedRect = (x: number, y: number, w: number, h: number, r: number, width = 1, color = border) => {
+    const k = 0.5522848;
+    const c = r * k;
+    return [
+      `${color} RG ${width} w`,
+      `${x + r} ${y} m`,
+      `${x + w - r} ${y} l`,
+      `${x + w - r + c} ${y} ${x + w} ${y + r - c} ${x + w} ${y + r} c`,
+      `${x + w} ${y + h - r} l`,
+      `${x + w} ${y + h - r + c} ${x + w - r + c} ${y + h} ${x + w - r} ${y + h} c`,
+      `${x + r} ${y + h} l`,
+      `${x + r - c} ${y + h} ${x} ${y + h - r + c} ${x} ${y + h - r} c`,
+      `${x} ${y + r} l`,
+      `${x} ${y + r - c} ${x + r - c} ${y} ${x + r} ${y} c S`,
+    ].join("\n");
+  };
+
+  const rows = [
+    { label: "DATE", value: data.date || "-" },
+    { label: "TIME SLOT", value: data.time || "-" },
+    { label: "ARRANGEMENT", value: data.arrangement || "-" },
+    { label: "LOCATION", value: data.location || "-" },
+    { label: "ASSIGNED BROTHER", value: data.assignedBrother || "-" },
+    { label: "CONTACT NUMBER", value: data.contact || "-" },
+  ];
 
   const lines: string[] = [
     "q",
-    // Background.
-    `${white} rg 0 0 ${pageWidth} ${pageHeight} re f`,
+    // Page background.
+    fillRect(0, 0, pageWidth, pageHeight, white),
 
-    // Top navy header and gold accents.
-    `${navy} rg 0 760 ${pageWidth} 82 re f`,
-    `${gold} rg 0 760 ${pageWidth} 3 re f`,
-    `${gold} rg 0 839 ${pageWidth} 3 re f`,
-    `${white} rg /F2 18 Tf 1 0 0 1 50 792 Tm (${esc(congregationName)}) Tj`,
+    // Header strip.
+    fillRect(0, 790, pageWidth, 52, navy),
+    fillRect(0, 787, pageWidth, 3, gold),
+    textAt(42, 808, 15, congregationName, "F2", white),
 
-    // Main title.
-    textAt(50, 724, 25, "ARRANGEMENT NOTIFICATION", "F2"),
-    `${gold} RG 1.2 w 155 707 m 440 707 l S`,
-    `${navy} rg 172 674 251 34 re f`,
-    `${gold} rg 164 674 8 34 re f`,
-    `${gold} rg 423 674 8 34 re f`,
-    `${white} rg /F2 14 Tf 1 0 0 1 226 686 Tm (CART WITNESSING) Tj`,
+    // Title and banner.
+    textAt(70, 750, 25, "ARRANGEMENT NOTIFICATION", "F2"),
+    strokeLine(175, 734, 420, 734, 1.1, gold),
+    fillRect(108, 697, 379, 34, navy),
+    fillRect(100, 697, 8, 34, gold),
+    fillRect(487, 697, 8, 34, gold),
+    textAt(214, 708, 14, "CART WITNESSING", "F2", white),
 
-    // Detail rows.
-    roundedRect(42, 598, 511, 54, white),
-    roundedRect(42, 536, 511, 54, white),
-    roundedRect(42, 474, 511, 54, white),
-    roundedRect(42, 412, 511, 54, white),
-    roundedRect(42, 350, 511, 54, white),
-    roundedRect(42, 288, 511, 54, white),
+    // Congregation box.
+    strokeRoundedRect(42, 650, 511, 34, 7, 1.1, navy),
+    textAt(177, 662, 13, congregationName, "F2"),
 
-    // Row dividers.
-    line(42, 598, 553, 598),
-    line(42, 536, 553, 536),
-    line(42, 474, 553, 474),
-    line(42, 412, 553, 412),
-    line(42, 350, 553, 350),
-    line(42, 288, 553, 288),
-
-    // Simple letter icons: deliberately plain, with no Bible/logo.
-    circle(70, 625, 17),
-    circle(70, 563, 17),
-    circle(70, 501, 17),
-    circle(70, 439, 17),
-    circle(70, 377, 17),
-    circle(70, 315, 17),
-    `${white} rg /F2 10 Tf 1 0 0 1 66 621 Tm (D) Tj`,
-    `${white} rg /F2 10 Tf 1 0 0 1 66 559 Tm (T) Tj`,
-    `${white} rg /F2 10 Tf 1 0 0 1 66 497 Tm (A) Tj`,
-    `${white} rg /F2 10 Tf 1 0 0 1 66 435 Tm (L) Tj`,
-    `${white} rg /F2 10 Tf 1 0 0 1 66 373 Tm (B) Tj`,
-    `${white} rg /F2 10 Tf 1 0 0 1 66 311 Tm (C) Tj`,
-
-    // Labels.
-    textAt(105, 621, 10, "DATE", "F2"),
-    textAt(105, 559, 10, "TIME SLOT", "F2"),
-    textAt(105, 497, 10, "ARRANGEMENT", "F2"),
-    textAt(105, 435, 10, "LOCATION", "F2"),
-    textAt(105, 373, 10, "ASSIGNED BROTHER", "F2"),
-    textAt(105, 311, 10, "CONTACT NUMBER", "F2"),
-
-    // Values.
-    textAt(205, 621, 10, data.date || "-", "F1"),
-    textAt(205, 559, 10, data.time || "-", "F1"),
-    ...arrangementLines.map((value, index) => textAt(205, index === 0 ? 497 : 484, 9, value, "F1")),
-    ...locationLines.map((value, index) => textAt(205, index === 0 ? 435 : 422, 9, value, "F1")),
-    ...brotherLines.map((value, index) => textAt(205, index === 0 ? 373 : 360, 10, value, "F1")),
-    textAt(205, 311, 10, data.contact || "-", "F1"),
-
-    // Please Note panel.
-    `${lightBlue} rg 42 62 511 200 re f`,
-    `${navy} rg 42 234 511 28 re f`,
-    `${gold} rg 190 234 9 28 re f`,
-    `${white} rg /F2 13 Tf 1 0 0 1 61 243 Tm (PLEASE NOTE) Tj`,
-
-    // Note point 1.
-    circle(70, 200, 12),
-    `${white} rg /F2 9 Tf 1 0 0 1 66 197 Tm (1) Tj`,
-    `${darkText} rg /F1 8.5 Tf 1 0 0 1 95 207 Tm (If several brothers and sisters sign up, you may be asked) Tj`,
-    `${darkText} rg /F1 8.5 Tf 1 0 0 1 95 194 Tm (to serve for only 30 minutes.) Tj`,
-    `${darkText} rg /F1 8.5 Tf 1 0 0 1 95 181 Tm (Please check your schedule accordingly.) Tj`,
-    line(95, 170, 535, 170, 0.6, "0.72 0.78 0.86"),
-
-    // Note point 2.
-    circle(70, 141, 12),
-    `${white} rg /F2 9 Tf 1 0 0 1 66 138 Tm (2) Tj`,
-    `${darkText} rg /F1 8.5 Tf 1 0 0 1 95 148 Tm (After your assigned time, you may also continue with) Tj`,
-    `${darkText} rg /F1 8.5 Tf 1 0 0 1 95 135 Tm (informal witnessing or the house-to-house ministry) Tj`,
-    `${darkText} rg /F1 8.5 Tf 1 0 0 1 95 122 Tm (with your assigned partner.) Tj`,
-    line(95, 111, 535, 111, 0.6, "0.72 0.78 0.86"),
-
-    // Note point 3.
-    circle(70, 82, 12),
-    `${white} rg /F2 9 Tf 1 0 0 1 66 79 Tm (3) Tj`,
-    `${darkText} rg /F1 8.5 Tf 1 0 0 1 95 89 Tm (For this, please contact the assigned brother;) Tj`,
-    `${darkText} rg /F1 8.5 Tf 1 0 0 1 95 76 Tm (he will provide you with the territory.) Tj`,
+    // Main information box.
+    strokeRoundedRect(42, 352, 511, 282, 8, 1.1, navy),
   ];
 
-  if (noteLine) {
-    const noteLines = wrapText(noteLine, 80);
+  // Six large boxed rows. No vertical gold divider; only clean row separators.
+  const rowTop = 634;
+  const rowHeight = 47;
+  const labelX = 64;
+  const valueX = 205;
+  rows.forEach((row, index) => {
+    const top = rowTop - index * rowHeight;
+    const baseline = top - 30;
+    if (index > 0) lines.push(strokeLine(50, top, 545, top, 0.8, border));
+    lines.push(textAt(labelX, baseline, 9.5, row.label, "F2"));
+    const valueLines = wrapText(row.value, row.label === "ARRANGEMENT" ? 38 : 42);
+    lines.push(textAt(valueX, baseline, 11.5, valueLines[0], "F1", darkText));
+    if (valueLines[1]) lines.push(textAt(valueX, baseline - 13, 10.5, valueLines[1], "F1", darkText));
+  });
+
+  // Please note box.
+  lines.push(
+    strokeRoundedRect(42, 72, 511, 250, 8, 1.1, navy),
+    fillRect(42, 292, 511, 30, navy),
+    fillRect(184, 292, 9, 30, gold),
+    textAt(58, 302, 13, "PLEASE NOTE", "F2", white),
+
+    // Note 1.
+    fillRect(62, 242, 25, 25, navy),
+    textAt(70, 250, 10, "1", "F2", white),
+    textAt(103, 254, 9, "If several brothers and sisters sign up, you may be asked", "F1", darkText),
+    textAt(103, 241, 9, "to serve for only 30 minutes.", "F1", darkText),
+    textAt(103, 228, 9, "Please check your schedule accordingly.", "F1", darkText),
+    strokeLine(103, 217, 535, 217, 0.7, border),
+
+    // Note 2.
+    fillRect(62, 175, 25, 25, navy),
+    textAt(70, 183, 10, "2", "F2", white),
+    textAt(103, 187, 9, "After your assigned time, you may also continue with", "F1", darkText),
+    textAt(103, 174, 9, "informal witnessing or the house-to-house ministry", "F1", darkText),
+    textAt(103, 161, 9, "with your assigned partner.", "F1", darkText),
+    strokeLine(103, 150, 535, 150, 0.7, border),
+
+    // Note 3.
+    fillRect(62, 108, 25, 25, navy),
+    textAt(70, 116, 10, "3", "F2", white),
+    textAt(103, 120, 9, "For this, please contact the assigned brother;", "F1", darkText),
+    textAt(103, 107, 9, "he will provide you with the territory.", "F1", darkText),
+  );
+
+  if (data.note?.trim()) {
+    const custom = wrapText(data.note.trim(), 65);
     lines.push(
-      `${navy} rg /F2 7.5 Tf`,
-      `1 0 0 1 95 63 Tm (${esc(noteLines[0])}) Tj`,
+      strokeLine(103, 95, 535, 95, 0.7, border),
+      textAt(103, 84, 8.5, `Additional note: ${custom[0]}`, "F2", darkText),
     );
+    if (custom[1]) lines.push(textAt(103, 73, 8.5, custom[1], "F1", darkText));
   }
 
   lines.push(
     // Footer.
-    `${gold} RG 1 w 145 42 m 450 42 l S`,
-    `${navy} rg /F1 9 Tf 1 0 0 1 180 28 Tm (Thank you for your fine cooperation in the ministry.) Tj`,
-    `${navy} rg 0 0 595 18 re f`,
-    `${gold} rg 0 18 595 3 re f`,
+    strokeLine(155, 45, 440, 45, 1, gold),
+    textAt(165, 29, 9, "Thank you for your fine cooperation in the ministry.", "F1", navy),
+    fillRect(0, 0, 595, 15, navy),
+    fillRect(0, 15, 595, 3, gold),
     "Q",
   );
 
@@ -814,43 +805,61 @@ function ArrangementNotification({
           <Typography variant="subtitle2" fontWeight={800} color="primary.main" sx={{ mb: 1.5 }}>Preview (Final PDF Design)</Typography>
           <Card variant="outlined" sx={{ borderRadius: 2.5, overflow: "hidden", maxWidth: 620, mx: "auto", bgcolor: "#fff", borderColor: "#d5dbe5" }}>
             <Box sx={{ bgcolor: "#fff", color: "#0b1f4a", fontFamily: "Arial, sans-serif" }}>
-              <Box sx={{ bgcolor: "#0b1f4a", borderBottom: "3px solid #d9a52e", px: { xs: 2, md: 4 }, py: 2.5 }}>
-                <Typography sx={{ color: "#fff", fontWeight: 800, fontSize: { xs: 15, md: 18 } }}>{congregationName}</Typography>
+              <Box sx={{ bgcolor: "#0b1f4a", borderBottom: "3px solid #d9a52e", px: { xs: 2.5, md: 4 }, py: 2.5 }}>
+                <Typography sx={{ color: "#fff", fontWeight: 900, fontSize: { xs: 16, md: 19 }, letterSpacing: 0.2 }}>{congregationName}</Typography>
               </Box>
-              <Box sx={{ px: { xs: 2, md: 4 }, pt: 3, pb: 2 }}>
-                <Typography sx={{ fontWeight: 900, letterSpacing: 0.3, fontSize: { xs: 20, md: 25 }, color: "#0b1f4a" }}>ARRANGEMENT NOTIFICATION</Typography>
-                <Box sx={{ mt: 1.5, mb: 2.5, mx: "auto", maxWidth: 285, bgcolor: "#0b1f4a", borderLeft: "8px solid #d9a52e", borderRight: "8px solid #d9a52e", py: 0.8 }}>
-                  <Typography align="center" sx={{ color: "#fff", fontWeight: 800, fontSize: { xs: 11, md: 14 } }}>CART WITNESSING</Typography>
+              <Box sx={{ px: { xs: 2, md: 3.5 }, pt: 2.5, pb: 2 }}>
+                <Typography sx={{ fontWeight: 900, letterSpacing: 0.2, fontSize: { xs: 22, md: 27 }, color: "#0b1f4a" }}>ARRANGEMENT NOTIFICATION</Typography>
+                <Box sx={{ mt: 1.5, mb: 1.8, mx: "auto", maxWidth: 300, bgcolor: "#0b1f4a", borderLeft: "9px solid #d9a52e", borderRight: "9px solid #d9a52e", py: 0.9 }}>
+                  <Typography align="center" sx={{ color: "#fff", fontWeight: 900, fontSize: { xs: 12, md: 15 } }}>CART WITNESSING</Typography>
                 </Box>
-                <Stack spacing={0}>
+                <Box sx={{ border: "1.5px solid #0b1f4a", borderRadius: 2, overflow: "hidden" }}>
+                  <Box sx={{ px: 2, py: 1.2, borderBottom: "1px solid #b9c2cf", bgcolor: "#fff" }}>
+                    <Typography align="center" sx={{ fontWeight: 900, color: "#0b1f4a", fontSize: { xs: 11, md: 13 } }}>{congregationName}</Typography>
+                  </Box>
                   {[
-                    ["DATE", date ? formatDate(date) : "—"],
-                    ["TIME SLOT", time || "—"],
-                    ["ARRANGEMENT", arrangement || "—"],
-                    ["LOCATION", location || "—"],
-                    ["ASSIGNED BROTHER", assignedBrother || "—"],
-                    ["CONTACT NUMBER", contact || "—"],
-                  ].map(([label, value]) => (
-                    <Box key={label} sx={{ minHeight: 58, display: "grid", gridTemplateColumns: { xs: "125px 1fr", md: "160px 1fr" }, alignItems: "center", borderBottom: "1px solid #b9c2cf" }}>
-                      <Typography sx={{ fontWeight: 800, fontSize: { xs: 8, md: 10 }, color: "#0b1f4a", pr: 1, minHeight: 30, display: "flex", alignItems: "center" }}>{label}</Typography>
-                      <Typography sx={{ pl: 2, fontSize: { xs: 9, md: 11 }, color: "#111827", wordBreak: "break-word" }}>{value}</Typography>
+                    ["DATE", date ? formatDate(date) : "-"],
+                    ["TIME SLOT", time || "-"],
+                    ["ARRANGEMENT", arrangement || "-"],
+                    ["LOCATION", location || "-"],
+                    ["ASSIGNED BROTHER", assignedBrother || "-"],
+                    ["CONTACT NUMBER", contact || "-"],
+                  ].map(([label, value], index, items) => (
+                    <Box key={label} sx={{ minHeight: { xs: 64, md: 70 }, display: "grid", gridTemplateColumns: { xs: "145px 1fr", md: "185px 1fr" }, alignItems: "center", px: { xs: 1.5, md: 2.5 }, borderBottom: index === items.length - 1 ? "none" : "1px solid #b9c2cf", bgcolor: "#fff" }}>
+                      <Typography sx={{ fontWeight: 900, fontSize: { xs: 10.5, md: 12 }, color: "#0b1f4a", pr: 1.5 }}>{label}</Typography>
+                      <Typography sx={{ fontWeight: 600, fontSize: { xs: 11.5, md: 13 }, color: "#111827", wordBreak: "break-word" }}>{value}</Typography>
                     </Box>
                   ))}
-                </Stack>
-                <Box sx={{ mt: 3, bgcolor: "#eef4fc", p: 2, borderRadius: 1 }}>
-                  <Box sx={{ bgcolor: "#0b1f4a", px: 1.5, py: 0.8, mb: 1.5 }}><Typography sx={{ color: "#fff", fontWeight: 800, fontSize: 11 }}>PLEASE NOTE</Typography></Box>
-                  <Stack spacing={1.2}>
-                    <Typography sx={{ fontSize: 8.5 }}>1. If several brothers and sisters sign up, you may be asked to serve for only 30 minutes. Please check your schedule accordingly.</Typography>
-                    <Divider />
-                    <Typography sx={{ fontSize: 8.5 }}>2. After your assigned time, you may also continue with informal witnessing or the house-to-house ministry with your assigned partner.</Typography>
-                    <Divider />
-                    <Typography sx={{ fontSize: 8.5 }}>3. For this, please contact the assigned brother; he will provide you with the territory.</Typography>
-                    {note.trim() && <><Divider /><Typography sx={{ fontSize: 8.5, fontWeight: 700 }}>Additional note: {note}</Typography></>}
+                </Box>
+                <Box sx={{ mt: 2.5, border: "1.5px solid #0b1f4a", borderRadius: 2, overflow: "hidden", bgcolor: "#eef4fc" }}>
+                  <Box sx={{ bgcolor: "#0b1f4a", px: 1.8, py: 1, borderBottom: "3px solid #d9a52e" }}>
+                    <Typography sx={{ color: "#fff", fontWeight: 900, fontSize: { xs: 12, md: 14 } }}>PLEASE NOTE</Typography>
+                  </Box>
+                  <Stack spacing={0}>
+                    <Box sx={{ display: "grid", gridTemplateColumns: "34px 1fr", gap: 1.2, px: 1.8, py: 1.4, borderBottom: "1px solid #b9c2cf" }}>
+                      <Box sx={{ width: 27, height: 27, bgcolor: "#0b1f4a", color: "#fff", display: "grid", placeItems: "center", borderRadius: 0.8, fontWeight: 900 }}>1</Box>
+                      <Typography sx={{ fontSize: { xs: 9.5, md: 10.5 }, lineHeight: 1.45 }}>If several brothers and sisters sign up, you may be asked to serve for only 30 minutes. Please check your schedule accordingly.</Typography>
+                    </Box>
+                    <Box sx={{ display: "grid", gridTemplateColumns: "34px 1fr", gap: 1.2, px: 1.8, py: 1.4, borderBottom: "1px solid #b9c2cf" }}>
+                      <Box sx={{ width: 27, height: 27, bgcolor: "#0b1f4a", color: "#fff", display: "grid", placeItems: "center", borderRadius: 0.8, fontWeight: 900 }}>2</Box>
+                      <Typography sx={{ fontSize: { xs: 9.5, md: 10.5 }, lineHeight: 1.45 }}>After your assigned time, you may also continue with informal witnessing or the house-to-house ministry with your assigned partner.</Typography>
+                    </Box>
+                    <Box sx={{ display: "grid", gridTemplateColumns: "34px 1fr", gap: 1.2, px: 1.8, py: 1.4, borderBottom: note.trim() ? "1px solid #b9c2cf" : "none" }}>
+                      <Box sx={{ width: 27, height: 27, bgcolor: "#0b1f4a", color: "#fff", display: "grid", placeItems: "center", borderRadius: 0.8, fontWeight: 900 }}>3</Box>
+                      <Typography sx={{ fontSize: { xs: 9.5, md: 10.5 }, lineHeight: 1.45 }}>For this, please contact the assigned brother; he will provide you with the territory.</Typography>
+                    </Box>
+                    {note.trim() && (
+                      <Box sx={{ px: 2, py: 1.2 }}>
+                        <Typography sx={{ fontSize: { xs: 9, md: 10 }, fontWeight: 800 }}>Additional note: {note}</Typography>
+                      </Box>
+                    )}
                   </Stack>
                 </Box>
-                <Box sx={{ mt: 2.5, borderTop: "1px solid #d9a52e", pt: 1.5 }}><Typography align="center" sx={{ fontSize: 8.5, fontStyle: "italic", color: "#526070" }}>Thank you for your fine cooperation in the ministry.</Typography></Box>
+                <Box sx={{ mt: 2, borderTop: "1px solid #d9a52e", pt: 1.3 }}>
+                  <Typography align="center" sx={{ fontSize: { xs: 9, md: 10 }, fontStyle: "italic", color: "#526070" }}>Thank you for your fine cooperation in the ministry.</Typography>
+                </Box>
               </Box>
-              <Box sx={{ height: 8, bgcolor: "#0b1f4a", borderTop: "3px solid #d9a52e" }} />
+              <Box sx={{ height: 9, bgcolor: "#0b1f4a", borderTop: "3px solid #d9a52e" }} />
             </Box>
           </Card>
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1, textAlign: "center" }}>
