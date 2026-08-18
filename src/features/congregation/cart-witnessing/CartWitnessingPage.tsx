@@ -224,16 +224,13 @@ async function createArrangementNotificationPdf(data: {
     fillRect(487, 697, 8, 34, gold),
     textAt(214, 708, 14, "CART WITNESSING", "F2", white),
 
-    // Congregation box.
-    strokeRoundedRect(42, 650, 511, 34, 7, 1.1, navy),
-    textAt(177, 662, 13, congregationName, "F2"),
-
-    // Main information box.
-    strokeRoundedRect(42, 352, 511, 282, 8, 1.1, navy),
+    // Main information box. The congregation name is already shown in the header,
+    // so it is intentionally not repeated here.
+    strokeRoundedRect(42, 352, 511, 320, 8, 1.1, navy),
   ];
 
   // Six large boxed rows. No vertical gold divider; only clean row separators.
-  const rowTop = 634;
+  const rowTop = 672;
   const rowHeight = 47;
   const labelX = 64;
   const valueX = 205;
@@ -257,9 +254,9 @@ async function createArrangementNotificationPdf(data: {
     // Note 1.
     fillRect(62, 242, 25, 25, navy),
     textAt(70, 250, 10, "1", "F2", white),
-    textAt(103, 254, 9, "If several brothers and sisters sign up, you may be asked", "F1", darkText),
-    textAt(103, 241, 9, "to serve for only 30 minutes.", "F1", darkText),
-    textAt(103, 228, 9, "Please check your schedule accordingly.", "F1", darkText),
+    textAt(103, 254, 8.5, "If several brothers and sisters sign up, the 2-hour period may be", "F1", darkText),
+    textAt(103, 242, 8.5, "divided into 30-minute assignments so that more participants can", "F1", darkText),
+    textAt(103, 230, 8.5, "have an opportunity to serve. Please check your schedule accordingly.", "F1", darkText),
     strokeLine(103, 217, 535, 217, 0.7, border),
 
     // Note 2.
@@ -344,7 +341,7 @@ export default function CartWitnessingPage() {
   });
   const [weekendDay, setWeekendDay] = useState<"saturday" | "sunday">("saturday");
   const [arrangementDate, setArrangementDate] = useState("");
-  const [arrangementTime, setArrangementTime] = useState("9:00 AM - 10:00 AM");
+  const [arrangementTime, setArrangementTime] = useState("9:30 AM - 11:30 AM");
   const [arrangement, setArrangement] = useState("Cart Witnessing - Residential");
   const [arrangementLocation, setArrangementLocation] = useState("");
   const [assignedBrother, setAssignedBrother] = useState("");
@@ -365,9 +362,9 @@ export default function CartWitnessingPage() {
       if (entry.time.trim()) values.add(entry.time.trim());
     }
     for (const captain of arrangementCaptains) {
-      if (captain.from || captain.to) values.add(`${captain.from || "9:00 AM"} - ${captain.to || "10:00 AM"}`);
+      if (captain.from || captain.to) values.add(`${captain.from || "9:30 AM"} - ${captain.to || "11:30 AM"}`);
     }
-    if (!values.size) values.add("9:00 AM - 10:00 AM");
+    if (!values.size) values.add("9:30 AM - 11:30 AM");
     return [...values];
   }, [arrangementDate, arrangementCaptains, schedule.entries]);
 
@@ -838,7 +835,7 @@ function ArrangementNotification({
                   <Stack spacing={0}>
                     <Box sx={{ display: "grid", gridTemplateColumns: "34px 1fr", gap: 1.2, px: 1.8, py: 1.4, borderBottom: "1px solid #b9c2cf" }}>
                       <Box sx={{ width: 27, height: 27, bgcolor: "#0b1f4a", color: "#fff", display: "grid", placeItems: "center", borderRadius: 0.8, fontWeight: 900 }}>1</Box>
-                      <Typography sx={{ fontSize: { xs: 9.5, md: 10.5 }, lineHeight: 1.45 }}>If several brothers and sisters sign up, you may be asked to serve for only 30 minutes. Please check your schedule accordingly.</Typography>
+                      <Typography sx={{ fontSize: { xs: 9.5, md: 10.5 }, lineHeight: 1.45 }}>If several brothers and sisters sign up, the 2-hour period may be divided into 30-minute assignments so that more participants can have an opportunity to serve. Please check your schedule accordingly.</Typography>
                     </Box>
                     <Box sx={{ display: "grid", gridTemplateColumns: "34px 1fr", gap: 1.2, px: 1.8, py: 1.4, borderBottom: "1px solid #b9c2cf" }}>
                       <Box sx={{ width: 27, height: 27, bgcolor: "#0b1f4a", color: "#fff", display: "grid", placeItems: "center", borderRadius: 0.8, fontWeight: 900 }}>2</Box>
@@ -998,4 +995,3 @@ function EntryCard({ entry, captains, onChange, onAssignCaptain, onDelete }: { e
     </Card>
   );
 }
-
