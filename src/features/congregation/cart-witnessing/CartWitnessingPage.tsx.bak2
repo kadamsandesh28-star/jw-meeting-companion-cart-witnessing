@@ -1,0 +1,418 @@
+import { useMemo, useState } from "react";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import PictureAsPdfRoundedIcon from "@mui/icons-material/PictureAsPdfRounded";
+import ShareRoundedIcon from "@mui/icons-material/ShareRounded";
+import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
+import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
+import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
+import TodayRoundedIcon from "@mui/icons-material/TodayRounded";
+import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import PersonAddAltRoundedIcon from "@mui/icons-material/PersonAddAltRounded";
+import {
+  Box, Button, Card, CardContent, Chip, Divider, Grid, MenuItem, Paper, Select,
+  Stack, TextField, ToggleButton, ToggleButtonGroup, Typography,
+} from "@mui/material";
+import {
+  CartWitnessingCaptain, CartWitnessingEntry, CartWitnessingMode, CartWitnessingSchedule,
+} from "./models/CartWitnessingSchedule";
+import {
+  createEmptyCartWitnessingSchedule, createEntry,
+} from "./services/createEmptyCartWitnessingSchedule";
+import { loadCartWitnessingSchedules, saveCartWitnessingSchedule } from "./storage/cartWitnessingStorage";
+import { exportCartWitnessingPdf, createCartWitnessingPdfBlob } from "./export/exportCartWitnessingPdf";
+import { exportCartWitnessingWord } from "./export/exportCartWitnessingWord";
+import { loadCongregationProfile } from "../../settings/storage/congregationProfileStorage";
+
+function shiftIsoDate(value: string, days: number) {
+  const d = new Date(`${value}T00:00:00`);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function saturdayOf(value: string) {
+  const d = new Date(`${value}T00:00:00`);
+  const day = d.getDay();
+  d.setDate(d.getDate() + (6 - day));
+  return d.toISOString().slice(0, 10);
+}
+
+/** Keep saved schedule rows aligned with the selected week. If an older saved
+ * test schedule is exactly one or more whole weeks behind the selected
+ * Saturday, migrate its dates forward rather than exporting a mixed week. */
+function normalizeScheduleWeek(schedule: CartWitnessingSchedule) {
+  const targetWeek = schedule.weekOf;
+  if (!targetWeek) return schedule;
+
+  const sourceWeeks = [...new Set([
+    ...schedule.entries.map((entry) => saturdayOf(entry.date)),
+    ...Object.keys(schedule.dayCaptains ?? {}).map((date) => saturdayOf(date)),
+  ])];
+
+  if (!sourceWeeks.length) return schedule;
+  if (sourceWeeks.length === 1 && sourceWeeks[0] === targetWeek) return schedule;
+  if (sourceWeeks.length !== 1) return schedule;
+
+  const sourceWeek = sourceWeeks[0];
+  const deltaDays = Math.round((new Date(`${targetWeek}T00:00:00`).getTime() - new Date(`${sourceWeek}T00:00:00`).getTime()) / 86400000);
+  if (deltaDays === 0 || deltaDays % 7 !== 0) return schedule;
+
+  const entries = schedule.entries.map((entry) => ({ ...entry, date: shiftIsoDate(entry.date, deltaDays) }));
+  const dayCaptains = Object.fromEntries(Object.entries(schedule.dayCaptains ?? {}).map(([date, captains]) => [shiftIsoDate(date, deltaDays), captains]));
+
+  return { ...schedule, entries, dayCaptains, updatedAt: Date.now() };
+}
+
+const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+function formatDate(value: string) {
+  if (!value) return "";
+  return new Date(`${value}T00:00:00`).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+}
+
+function getWeekDates(saturday: string) {
+  const date = new Date(`${saturday}T00:00:00`);
+  return days.map((_, index) => {
+    const d = new Date(date);
+    d.setDate(date.getDate() - (6 - index));
+    return d.toISOString().slice(0, 10);
+  });
+}
+
+function parseClock(value: string) {
+  const match = value.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+  if (!match) return null;
+  let hour = Number(match[1]);
+  const minute = Number(match[2]);
+  const meridiem = match[3]?.toUpperCase();
+  if (meridiem === "PM" && hour < 12) hour += 12;
+  if (meridiem === "AM" && hour === 12) hour = 0;
+  return hour * 60 + minute;
+}
+
+function getEndMinutes(value: string) {
+  const matches = value.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/gi) ?? [];
+  const last = matches[matches.length - 1];
+  return parseClock(last ?? value) ?? 9 * 60;
+}
+
+function formatClock(totalMinutes: number) {
+  const hour24 = Math.floor(totalMinutes / 60) % 24;
+  const minute = totalMinutes % 60;
+  const suffix = hour24 >= 12 ? "PM" : "AM";
+  const hour12 = hour24 % 12 || 12;
+  return `${hour12}:${String(minute).padStart(2, "0")} ${suffix}`;
+}
+
+export default function CartWitnessingPage() {
+  const congregationName = loadCongregationProfile().congregationName || "Congregation";
+  const [mode, setMode] = useState<CartWitnessingMode>("weekly");
+  const [schedule, setSchedule] = useState<CartWitnessingSchedule>(() => {
+    const saved = loadCartWitnessingSchedules();
+    const latest = saved.sort((a, b) => b.updatedAt - a.updatedAt)[0] ?? createEmptyCartWitnessingSchedule();
+    return normalizeScheduleWeek(latest);
+  });
+  const [dailyDate, setDailyDate] = useState(schedule.weekOf);
+
+  const weekDates = useMemo(() => getWeekDates(schedule.weekOf), [schedule.weekOf]);
+
+  function updateEntry(id: string, field: keyof CartWitnessingEntry, value: string) {
+    setSchedule((current) => ({
+      ...current,
+      updatedAt: Date.now(),
+      entries: current.entries.map((entry) => entry.id === id ? { ...entry, [field]: value } : entry),
+    }));
+  }
+
+  function assignCaptain(entryId: string, captainId: string) {
+    setSchedule((current) => {
+      const entry = current.entries.find((item) => item.id === entryId);
+      if (!entry) return current;
+      const captains = current.dayCaptains[entry.date] ?? [];
+      const captain = captains.find((item) => item.id === captainId);
+      return {
+        ...current,
+        updatedAt: Date.now(),
+        entries: current.entries.map((item) => item.id === entryId ? {
+          ...item,
+          captainId,
+          captainContact: captain ? `${captain.name}${captain.contact ? ` · ${captain.contact}` : ""}` : item.captainContact,
+        } : item),
+      };
+    });
+  }
+
+  function updateCaptain(date: string, id: string, field: keyof CartWitnessingCaptain, value: string) {
+    setSchedule((current) => ({
+      ...current,
+      updatedAt: Date.now(),
+      dayCaptains: {
+        ...current.dayCaptains,
+        [date]: (current.dayCaptains[date] ?? []).map((captain) => captain.id === id ? { ...captain, [field]: value } : captain),
+      },
+    }));
+  }
+
+  function addCaptain(date: string) {
+    setSchedule((current) => {
+      const captains = current.dayCaptains[date] ?? [];
+      if (captains.length >= 2) return current;
+      const captain: CartWitnessingCaptain = {
+        id: crypto.randomUUID(), name: "", from: "", to: "", contact: "",
+      };
+      return {
+        ...current,
+        updatedAt: Date.now(),
+        dayCaptains: { ...current.dayCaptains, [date]: [...captains, captain] },
+      };
+    });
+  }
+
+  function removeCaptain(date: string, id: string) {
+    setSchedule((current) => ({
+      ...current,
+      updatedAt: Date.now(),
+      dayCaptains: {
+        ...current.dayCaptains,
+        [date]: (current.dayCaptains[date] ?? []).filter((captain) => captain.id !== id),
+      },
+      entries: current.entries.map((entry) => entry.date === date && entry.captainId === id
+        ? { ...entry, captainId: "", captainContact: "" }
+        : entry),
+    }));
+  }
+
+  function addEntry(date: string) {
+    setSchedule((current) => ({ ...current, updatedAt: Date.now(), entries: [...current.entries, createEntry(date)] }));
+  }
+
+  function addTimedPair(date: string, minutes: 30 | 60) {
+    setSchedule((current) => {
+      const dayEntries = current.entries.filter((entry) => entry.date === date);
+      const lastTimed = [...dayEntries].reverse().find((entry) => entry.time.trim());
+      const start = lastTimed ? getEndMinutes(lastTimed.time) : 9 * 60;
+      const end = start + minutes;
+      const entry = createEntry(date);
+      entry.time = `${formatClock(start)} to ${formatClock(end)}`;
+      return { ...current, updatedAt: Date.now(), entries: [...current.entries, entry] };
+    });
+  }
+
+  function deleteEntry(id: string) {
+    setSchedule((current) => ({ ...current, updatedAt: Date.now(), entries: current.entries.filter((entry) => entry.id !== id) }));
+  }
+
+  function updateWeek(value: string) {
+    setSchedule((current) => ({ ...current, weekOf: value, updatedAt: Date.now() }));
+    setDailyDate(value);
+  }
+
+  function nextWeekTemplate() {
+    const next = new Date(`${schedule.weekOf}T00:00:00`);
+    next.setDate(next.getDate() + 7);
+    const nextSaturday = next.toISOString().slice(0, 10);
+    setSchedule(createEmptyCartWitnessingSchedule(nextSaturday));
+    setDailyDate(nextSaturday);
+  }
+
+  async function sharePdf() {
+    const blob = await createCartWitnessingPdfBlob(schedule);
+    const file = new File([blob], `${congregationName.replace(/[^a-z0-9]+/gi, "-")}-Cart-Witnessing-${schedule.weekOf}.pdf`, { type: "application/pdf" });
+    if (navigator.share && navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ title: "Cart Witnessing Weekly Schedule", files: [file] });
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = file.name;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function save() {
+    saveCartWitnessingSchedule(schedule);
+    alert("Cart Witnessing schedule saved successfully.");
+  }
+
+  const entriesForDate = (date: string) => schedule.entries.filter((entry) => entry.date === date);
+
+  return (
+    <Box sx={{ p: { xs: 2, md: 4 } }}>
+      <Stack spacing={3}>
+        <Paper elevation={0} sx={{ p: { xs: 3, md: 4 }, borderRadius: 4, border: 1, borderColor: "divider" }}>
+          <Stack spacing={2.5}>
+            <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" spacing={2}>
+              <Box>
+                <Typography variant="overline" color="primary.main" fontWeight={700}>CONGREGATION</Typography>
+                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                  <Typography variant="h4" fontWeight={800}>{congregationName}</Typography>
+                  <Button size="small" variant="outlined" startIcon={<EditRoundedIcon />} href="/settings">Edit</Button>
+                </Stack>
+                <Typography variant="h6" fontWeight={700}>Cart Witnessing — Weekly Schedule</Typography>
+                <Typography color="text.secondary">Reusable daily or weekly schedule — assign up to two day captains by time range.</Typography>
+              </Box>
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                <Chip icon={<CalendarMonthRoundedIcon />} label={`Week of ${formatDate(schedule.weekOf)}`} />
+                <Chip size="small" label={`${schedule.entries.length} schedule${schedule.entries.length === 1 ? "" : "s"}`} variant="outlined" />
+              </Stack>
+            </Stack>
+
+            <ToggleButtonGroup exclusive value={mode} onChange={(_, value) => value && setMode(value)} size="small">
+              <ToggleButton value="daily"><TodayRoundedIcon sx={{ mr: 1 }} />Daily</ToggleButton>
+              <ToggleButton value="weekly"><CalendarMonthRoundedIcon sx={{ mr: 1 }} />Weekly</ToggleButton>
+            </ToggleButtonGroup>
+
+            <Grid container spacing={2} alignItems="center">
+              <Grid size={{ xs: 12, sm: 5 }}>
+                <TextField fullWidth type="date" label="Saturday / Week Of" value={schedule.weekOf} onChange={(e) => updateWeek(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
+              </Grid>
+              {mode === "daily" && (
+                <Grid size={{ xs: 12, sm: 5 }}>
+                  <TextField fullWidth type="date" label="Daily Schedule Date" value={dailyDate} onChange={(e) => setDailyDate(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
+                </Grid>
+              )}
+            </Grid>
+
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+              <Button variant="contained" startIcon={<SaveRoundedIcon />} onClick={save}>Save</Button>
+              <Button variant="outlined" startIcon={<PictureAsPdfRoundedIcon />} onClick={() => exportCartWitnessingPdf(schedule)}>Export PDF</Button>
+              <Button variant="outlined" startIcon={<DescriptionRoundedIcon />} onClick={() => void exportCartWitnessingWord(schedule)}>Export Word</Button>
+              <Button variant="outlined" startIcon={<ShareRoundedIcon />} onClick={() => void sharePdf()}>Share PDF</Button>
+              <Button variant="text" onClick={nextWeekTemplate}>Next Week Template</Button>
+            </Stack>
+          </Stack>
+        </Paper>
+
+        {mode === "daily" ? (
+          <DailyView date={dailyDate} entries={entriesForDate(dailyDate)} captains={schedule.dayCaptains[dailyDate] ?? []} onAdd={() => addEntry(dailyDate)} onAddPair={(minutes) => addTimedPair(dailyDate, minutes)} onChange={updateEntry} onAssignCaptain={assignCaptain} onAddCaptain={() => addCaptain(dailyDate)} onUpdateCaptain={updateCaptain} onRemoveCaptain={removeCaptain} onDelete={deleteEntry} />
+        ) : (
+          <WeeklyView dates={weekDates} entries={schedule.entries} dayCaptains={schedule.dayCaptains} onAdd={addEntry} onAddPair={addTimedPair} onChange={updateEntry} onAssignCaptain={assignCaptain} onAddCaptain={addCaptain} onUpdateCaptain={updateCaptain} onRemoveCaptain={removeCaptain} onDelete={deleteEntry} />
+        )}
+      </Stack>
+    </Box>
+  );
+}
+
+type ViewProps = {
+  date: string;
+  entries: CartWitnessingEntry[];
+  captains: CartWitnessingCaptain[];
+  onAdd: () => void;
+  onAddPair: (minutes: 30 | 60) => void;
+  onChange: (id: string, field: keyof CartWitnessingEntry, value: string) => void;
+  onAssignCaptain: (entryId: string, captainId: string) => void;
+  onAddCaptain: () => void;
+  onUpdateCaptain: (date: string, id: string, field: keyof CartWitnessingCaptain, value: string) => void;
+  onRemoveCaptain: (date: string, id: string) => void;
+  onDelete: (id: string) => void;
+};
+
+function WeeklyView({ dates, entries, dayCaptains, onAdd, onAddPair, onChange, onAssignCaptain, onAddCaptain, onUpdateCaptain, onRemoveCaptain, onDelete }: { dates: string[]; entries: CartWitnessingEntry[]; dayCaptains: Record<string, CartWitnessingCaptain[]>; onAdd: (date: string) => void; onAddPair: (date: string, minutes: 30 | 60) => void; onChange: ViewProps["onChange"]; onAssignCaptain: ViewProps["onAssignCaptain"]; onAddCaptain: (date: string) => void; onUpdateCaptain: ViewProps["onUpdateCaptain"]; onRemoveCaptain: ViewProps["onRemoveCaptain"]; onDelete: ViewProps["onDelete"]; }) {
+  return (
+    <Stack spacing={2}>
+      {dates.map((date) => {
+        const saturday = new Date(`${date}T00:00:00`).getDay() === 6;
+        const dayEntries = entries
+          .filter((entry) => entry.date === date)
+          .sort((a, b) => (parseClock(a.time) ?? Number.MAX_SAFE_INTEGER) - (parseClock(b.time) ?? Number.MAX_SAFE_INTEGER));
+        return <DaySection key={date} date={date} saturday={saturday} entries={dayEntries} captains={dayCaptains[date] ?? []} onAdd={() => onAdd(date)} onAddPair={(minutes) => onAddPair(date, minutes)} onChange={onChange} onAssignCaptain={onAssignCaptain} onAddCaptain={() => onAddCaptain(date)} onUpdateCaptain={onUpdateCaptain} onRemoveCaptain={onRemoveCaptain} onDelete={onDelete} />;
+      })}
+    </Stack>
+  );
+}
+
+function DailyView({ date, entries, captains, onAdd, onAddPair, onChange, onAssignCaptain, onAddCaptain, onUpdateCaptain, onRemoveCaptain, onDelete }: ViewProps) {
+  return <DaySection date={date} saturday={new Date(`${date}T00:00:00`).getDay() === 6} entries={entries} captains={captains} onAdd={onAdd} onAddPair={onAddPair} onChange={onChange} onAssignCaptain={onAssignCaptain} onAddCaptain={onAddCaptain} onUpdateCaptain={onUpdateCaptain} onRemoveCaptain={onRemoveCaptain} onDelete={onDelete} />;
+}
+
+function DaySection({ date, saturday, entries, captains, onAdd, onAddPair, onChange, onAssignCaptain, onAddCaptain, onUpdateCaptain, onRemoveCaptain, onDelete }: ViewProps & { saturday: boolean }) {
+  return (
+    <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: 1, borderColor: saturday ? "warning.main" : "divider", bgcolor: saturday ? "warning.50" : "background.paper" }}>
+      <Stack spacing={2}>
+        <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" alignItems={{ xs: "stretch", md: "center" }} spacing={1.5}>
+          <Box>
+            <Typography variant="h6" fontWeight={800}>{formatDate(date)}</Typography>
+            {saturday && <Chip size="small" label="Saturday — Priority" color="warning" sx={{ mt: 0.5 }} />}
+          </Box>
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap justifyContent="flex-end">
+            <Button size="small" variant="outlined" startIcon={<PersonAddAltRoundedIcon />} onClick={onAddCaptain} disabled={captains.length >= 2}>{captains.length >= 2 ? "2 Captains Added" : `Add Captain (${captains.length}/2)`}</Button>
+            <Button size="small" variant="outlined" startIcon={<AddRoundedIcon />} onClick={onAdd}>Add Blank</Button>
+            <Button size="small" variant="contained" color={saturday ? "warning" : "primary"} startIcon={<AccessTimeRoundedIcon />} onClick={() => onAddPair(30)}>+ 30-min Pair</Button>
+            <Button size="small" variant="outlined" startIcon={<AccessTimeRoundedIcon />} onClick={() => onAddPair(60)}>+ 1-hour Pair</Button>
+          </Stack>
+        </Stack>
+
+        <CaptainPanel date={date} captains={captains} onUpdate={onUpdateCaptain} onRemove={onRemoveCaptain} />
+        <Divider />
+        {entries.length === 0 ? <Typography color="text.secondary">No schedule added yet.</Typography> : entries.map((entry) => <EntryCard key={entry.id} entry={entry} captains={captains} onChange={onChange} onAssignCaptain={onAssignCaptain} onDelete={onDelete} />)}
+      </Stack>
+    </Paper>
+  );
+}
+
+function CaptainPanel({ date, captains, onUpdate, onRemove }: { date: string; captains: CartWitnessingCaptain[]; onUpdate: ViewProps["onUpdateCaptain"]; onRemove: ViewProps["onRemoveCaptain"] }) {
+  if (!captains.length) return (
+    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5, borderStyle: "dashed" }}>
+      <Typography variant="body2" color="text.secondary">No day captain assigned. Add up to 2 captains and give each one a time range.</Typography>
+    </Paper>
+  );
+  return (
+    <Stack spacing={1.5}>
+      <Typography variant="subtitle2" fontWeight={800}>Day Captains</Typography>
+      <Grid container spacing={1.5}>
+        {captains.map((captain, index) => (
+          <Grid key={captain.id} size={{ xs: 12, md: 6 }}>
+            <Card variant="outlined" sx={{ borderRadius: 2.5 }}>
+              <CardContent sx={{ p: 1.75, "&:last-child": { pb: 1.75 } }}>
+                <Stack spacing={1.25}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Chip size="small" label={`Captain ${index + 1}`} color="primary" variant="outlined" />
+                    <Button color="error" size="small" startIcon={<DeleteOutlineRoundedIcon />} onClick={() => onRemove(date, captain.id)}>Remove</Button>
+                  </Stack>
+                  <Grid container spacing={1}>
+                    <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth size="small" label="Captain Name" value={captain.name} onChange={(e) => onUpdate(date, captain.id, "name", e.target.value)} /></Grid>
+                    <Grid size={{ xs: 6, sm: 3 }}><TextField fullWidth size="small" type="time" label="From" value={captain.from} onChange={(e) => onUpdate(date, captain.id, "from", e.target.value)} slotProps={{ inputLabel: { shrink: true } }} /></Grid>
+                    <Grid size={{ xs: 6, sm: 3 }}><TextField fullWidth size="small" type="time" label="To" value={captain.to} onChange={(e) => onUpdate(date, captain.id, "to", e.target.value)} slotProps={{ inputLabel: { shrink: true } }} /></Grid>
+                    <Grid size={{ xs: 12 }}><TextField fullWidth size="small" label="Contact" value={captain.contact} onChange={(e) => onUpdate(date, captain.id, "contact", e.target.value)} placeholder="Phone / preferred contact" /></Grid>
+                  </Grid>
+                </Stack>
+              </CardContent>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
+    </Stack>
+  );
+}
+
+function EntryCard({ entry, captains, onChange, onAssignCaptain, onDelete }: { entry: CartWitnessingEntry; captains: CartWitnessingCaptain[]; onChange: ViewProps["onChange"]; onAssignCaptain: ViewProps["onAssignCaptain"]; onDelete: ViewProps["onDelete"] }) {
+  const field = (key: keyof CartWitnessingEntry) => (e: React.ChangeEvent<HTMLInputElement>) => onChange(entry.id, key, e.target.value);
+  return (
+    <Card variant="outlined" sx={{ borderRadius: 2.5 }}>
+      <CardContent>
+        <Stack spacing={2}>
+          <Stack direction="row" justifyContent="flex-end">
+            <Button color="error" size="small" startIcon={<DeleteOutlineRoundedIcon />} onClick={() => onDelete(entry.id)}>Remove</Button>
+          </Stack>
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12, sm: 4, md: 2 }}><TextField fullWidth label="Time" value={entry.time} onChange={field("time")} placeholder="9:00–9:30" /></Grid>
+            <Grid size={{ xs: 12, sm: 8, md: 4 }}><TextField fullWidth label="Location" value={entry.location} onChange={field("location")} /></Grid>
+            <Grid size={{ xs: 12, sm: 4, md: 2 }}><TextField fullWidth label="Cart" value={entry.cart} onChange={field("cart")} placeholder="Cart 1" /></Grid>
+            <Grid size={{ xs: 12, sm: 8, md: 4 }}>
+              <Select fullWidth displayEmpty value={entry.captainId ?? ""} onChange={(e) => onAssignCaptain(entry.id, e.target.value)}>
+                <MenuItem value=""><em>No day captain</em></MenuItem>
+                {captains.map((captain, index) => <MenuItem key={captain.id} value={captain.id}>{captain.name || `Captain ${index + 1}`} {captain.from || captain.to ? `(${captain.from || "?"}–${captain.to || "?"})` : ""}</MenuItem>)}
+              </Select>
+            </Grid>
+            <Grid size={{ xs: 12, md: 6 }}><TextField fullWidth label="Participants" value={entry.participants} onChange={field("participants")} placeholder="Names" /></Grid>
+            <Grid size={{ xs: 12, md: 6 }}><TextField fullWidth label="Notes" value={entry.notes} onChange={field("notes")} /></Grid>
+            {!captains.length && entry.captainContact && <Grid size={{ xs: 12 }}><TextField fullWidth label="Captain / Contact Person" value={entry.captainContact} onChange={field("captainContact")} /></Grid>}
+          </Grid>
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
