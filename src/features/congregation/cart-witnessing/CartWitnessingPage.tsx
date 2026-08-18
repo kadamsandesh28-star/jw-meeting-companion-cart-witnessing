@@ -374,7 +374,7 @@ export default function CartWitnessingPage() {
     const firstEntry = schedule.entries.find((entry) => entry.date === date && entry.time.trim());
     setArrangementLocation(firstEntry?.location || "");
     setArrangementDate(date);
-    setArrangementTime(firstEntry?.time || (firstCaptain?.from || firstCaptain?.to ? `${firstCaptain.from || "9:00 AM"} - ${firstCaptain.to || "10:00 AM"}` : "9:00 AM - 10:00 AM"));
+    setArrangementTime(firstEntry?.time || (firstCaptain?.from || firstCaptain?.to ? `${firstCaptain.from || "9:30 AM"} - ${firstCaptain.to || "11:30 AM"}` : "9:30 AM - 11:30 AM"));
     setAssignedBrother(firstCaptain?.name || "");
     setArrangementContact(firstCaptain?.contact || "");
   }
@@ -388,7 +388,7 @@ export default function CartWitnessingPage() {
     const firstEntry = schedule.entries.find((entry) => entry.date === nextDate && entry.time.trim());
     setArrangementLocation(firstEntry?.location || "");
     setArrangementDate(nextDate);
-    setArrangementTime(firstEntry?.time || (firstCaptain?.from || firstCaptain?.to ? `${firstCaptain.from || "9:00 AM"} - ${firstCaptain.to || "10:00 AM"}` : "9:00 AM - 10:00 AM"));
+    setArrangementTime(firstEntry?.time || (firstCaptain?.from || firstCaptain?.to ? `${firstCaptain.from || "9:30 AM"} - ${firstCaptain.to || "11:30 AM"}` : "9:30 AM - 11:30 AM"));
     setAssignedBrother(firstCaptain?.name || "");
     setArrangementContact(firstCaptain?.contact || "");
   }, [arrangementDateOptions, arrangementDate, schedule.dayCaptains, schedule.entries]);
@@ -811,9 +811,6 @@ function ArrangementNotification({
                   <Typography align="center" sx={{ color: "#fff", fontWeight: 900, fontSize: { xs: 12, md: 15 } }}>CART WITNESSING</Typography>
                 </Box>
                 <Box sx={{ border: "1.5px solid #0b1f4a", borderRadius: 2, overflow: "hidden" }}>
-                  <Box sx={{ px: 2, py: 1.2, borderBottom: "1px solid #b9c2cf", bgcolor: "#fff" }}>
-                    <Typography align="center" sx={{ fontWeight: 900, color: "#0b1f4a", fontSize: { xs: 11, md: 13 } }}>{congregationName}</Typography>
-                  </Box>
                   {[
                     ["DATE", date ? formatDate(date) : "-"],
                     ["TIME SLOT", time || "-"],
